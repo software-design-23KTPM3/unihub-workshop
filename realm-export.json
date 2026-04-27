@@ -1,0 +1,80 @@
+{
+  "realm": "unihub",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "STUDENT",
+        "description": "Participating students"
+      },
+      {
+        "name": "ORGANIZER",
+        "description": "Workshop organizers/admins"
+      },
+      {
+        "name": "CHECKIN_STAFF",
+        "description": "Staff at workshop doors"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "unihub-backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "backend-secret-xyz",
+      "redirectUris": [],
+      "webOrigins": [],
+      "bearerOnly": true
+    },
+    {
+      "clientId": "unihub-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "student_test",
+      "enabled": true,
+      "email": "student@test.com",
+      "firstName": "Student",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "STUDENT"
+      ]
+    },
+    {
+      "username": "organizer_test",
+      "enabled": true,
+      "email": "organizer@test.com",
+      "firstName": "Organizer",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ORGANIZER"
+      ]
+    }
+  ]
+}

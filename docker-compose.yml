@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: unihub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: unihub_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis-rate:
+    image: redis:7-alpine
+    container_name: unihub-redis-rate
+    ports:
+      - "6380:6379"
+    command: redis-server --save "" --appendonly no
+
+  redis-lock:
+    image: redis:7-alpine
+    container_name: unihub-redis-lock
+    ports:
+      - "6381:6379"
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: unihub-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.0.0
+    container_name: unihub-keycloak
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/unihub_db
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: password
+    command: start-dev --import-realm
+    volumes:
+      - ./realm-export.json:/opt/keycloak/data/import/realm.json
+    depends_on:
+      - postgres
+
+  gateway:
+    image: openresty/openresty:alpine
+    container_name: unihub-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./nginx/lua:/etc/nginx/lua:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis-rate
+
+volumes:
+  postgres_data:
