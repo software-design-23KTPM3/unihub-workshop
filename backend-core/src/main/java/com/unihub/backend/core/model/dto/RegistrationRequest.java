@@ -6,8 +6,10 @@ import java.util.UUID;
 public class RegistrationRequest {
     @NotNull
     private UUID workshopId;
+
     @NotNull
     private String studentId;
+    
     private UUID idempotencyKey;
 
     public UUID getWorkshopId() { return workshopId; }

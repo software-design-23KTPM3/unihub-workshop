@@ -7,6 +7,7 @@ import com.unihub.backend.core.service.RegistrationService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import com.unihub.backend.core.repository.WorkshopRepository;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +20,12 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final StringRedisTemplate redisTemplate;
     private final RabbitTemplate rabbitTemplate;
 
-    public RegistrationServiceImpl(StringRedisTemplate redisTemplate, RabbitTemplate rabbitTemplate) {
+    private final WorkshopRepository workshopRepository;
+
+    public RegistrationServiceImpl(StringRedisTemplate redisTemplate, RabbitTemplate rabbitTemplate, WorkshopRepository workshopRepository) {
         this.redisTemplate = redisTemplate;
         this.rabbitTemplate = rabbitTemplate;
+        this.workshopRepository = workshopRepository;
     }
 
     private static final String IDEMPOTENCY_PREFIX = "idempotency:registration:";
@@ -44,6 +48,18 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         try {
             String slotKey = WORKSHOP_SLOTS_PREFIX + request.getWorkshopId();
+            
+            // 1. Kiểm tra xem key này có tồn tại trong Redis chưa
+            if (Boolean.FALSE.equals(redisTemplate.hasKey(slotKey))) {
+                // 2. Nếu không có, gọi xuống Database để lấy số lượng chỗ trống thực tế
+                int currentAvailable = workshopRepository.getAvailableSlots(request.getWorkshopId())
+                    .orElseThrow(() -> new RuntimeException("Workshop not found"));
+                
+                // 3. Lưu vào Redis (set giá trị khởi tạo)
+                redisTemplate.opsForValue().set(slotKey, String.valueOf(currentAvailable), 1, TimeUnit.HOURS);
+            }
+
+            // 4. Tiến hành trừ slot như bình thường
             Long remaining = redisTemplate.opsForValue().decrement(slotKey);
 
             if (remaining == null || remaining < 0) {
@@ -57,6 +73,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 
             request.setIdempotencyKey(idempotencyKey);
             rabbitTemplate.convertAndSend(REGISTRATION_EXCHANGE, REGISTRATION_ROUTING_KEY, request);
+            log.info("Bypass RabbitMQ for testing");
 
             return RegistrationResponse.builder()
                     .registrationId(idempotencyKey)

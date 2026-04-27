@@ -24,6 +24,7 @@ com/unihub/backend/core/exception/GlobalExceptionHandler.class
 com/unihub/backend/core/model/entity/SyncLog.class
 com/unihub/backend/core/model/dto/CheckinEvent.class
 com/unihub/backend/core/repository/SyncLogRepository.class
+com/unihub/backend/core/config/MailConfig.class
 com/unihub/backend/core/model/enums/WorkshopStatus.class
 com/unihub/backend/core/worker/AIWorker.class
 com/unihub/backend/core/model/entity/Student.class
@@ -34,7 +35,6 @@ com/unihub/backend/core/model/entity/Registration.class
 com/unihub/backend/core/model/enums/NotificationType.class
 com/unihub/backend/core/model/entity/SyncLog$SyncLogBuilder.class
 com/unihub/backend/core/model/enums/SyncStatus.class
-com/unihub/backend/core/worker/PaymentWorker.class
 com/unihub/backend/core/model/entity/Workshop.class
 com/unihub/backend/core/BackendCoreApplication.class
 com/unihub/backend/core/service/impl/RegistrationServiceImpl.class
@@ -50,8 +50,8 @@ com/unihub/backend/core/model/dto/WorkshopRequest.class
 com/unihub/backend/core/worker/strategy/EmailNotificationStrategy.class
 com/unihub/backend/core/config/RabbitConfig.class
 com/unihub/backend/core/model/entity/Transaction$TransactionBuilder.class
-com/unihub/backend/core/service/FileStorageService.class
 com/unihub/backend/core/model/enums/RegistrationStatus.class
+com/unihub/backend/core/service/FileStorageService.class
 com/unihub/backend/core/model/entity/Student$StudentBuilder.class
 com/unihub/backend/core/service/CheckinService.class
 com/unihub/backend/core/model/entity/Notification.class

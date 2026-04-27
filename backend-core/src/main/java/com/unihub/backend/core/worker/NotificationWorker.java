@@ -29,41 +29,33 @@ public class NotificationWorker {
                 .collect(Collectors.toMap(NotificationStrategy::getType, s -> s));
     }
 
-    @RabbitListener(queues = "registration.queue") // Listen to same queue or a dedicated one
+    @RabbitListener(queues = "notification.queue")
     public void handleRegistrationNotification(com.unihub.backend.core.model.dto.RegistrationRequest request) {
-        log.info("Generating notification for registration {}", request.getIdempotencyKey());
-        
-        // 1. Generate Mock QR Code
-        String qrCode = "QR_" + request.getStudentId() + "_" + request.getWorkshopId();
+        log.info("Processing notification for registration: {}", request.getIdempotencyKey());
 
-        // 2. Create Notification Entity
-        Notification notification = Notification.builder()
-                .studentId(request.getStudentId())
-                .type(NotificationType.EMAIL)
-                .content("Your registration is successful! QR Code: " + qrCode)
-                .status(NotificationStatus.PENDING)
-                .build();
-
-        notification = notificationRepository.save(notification);
-
-        // 3. Send via Strategy
         try {
+            Notification notification = Notification.builder()
+                    .studentId(request.getStudentId())
+                    .type(NotificationType.EMAIL)
+                    .content("Registration success! QR: QR_" + request.getStudentId())
+                    .status(NotificationStatus.PENDING)
+                    .workshopId(request.getWorkshopId())
+                    .build();
+
             NotificationStrategy strategy = strategies.get(notification.getType());
             if (strategy != null) {
                 strategy.send(notification);
                 notification.setStatus(NotificationStatus.SENT);
                 notification.setSentAt(ZonedDateTime.now());
             } else {
-                log.warn("No strategy found for type {}", notification.getType());
                 notification.setStatus(NotificationStatus.FAILED);
-                notification.setErrorMessage("No strategy found");
+                notification.setErrorMessage("No strategy found for " + notification.getType());
             }
-        } catch (Exception e) {
-            log.error("Failed to send notification", e);
-            notification.setStatus(NotificationStatus.FAILED);
-            notification.setErrorMessage(e.getMessage());
-        }
 
-        notificationRepository.save(notification);
+            notificationRepository.save(notification);
+
+        } catch (Exception e) {
+            log.error("Fatal error in NotificationWorker: {}", e.getMessage());
+        }
     }
 }
