@@ -1,5 +1,4 @@
--- Create schemas and tables for UniHub Workshop
-
+-- 1. Tạo tất cả các ENUM TYPE trước
 CREATE TYPE workshop_status AS ENUM ('ACTIVE', 'CANCELLED');
 CREATE TYPE summary_status AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
 CREATE TYPE registration_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED', 'CHECKED_IN');
@@ -8,6 +7,16 @@ CREATE TYPE notification_type AS ENUM ('EMAIL', 'PUSH', 'IN_APP');
 CREATE TYPE notification_status AS ENUM ('PENDING', 'SENT', 'FAILED');
 CREATE TYPE sync_status AS ENUM ('SUCCESS', 'PARTIAL', 'FAILED', 'RUNNING');
 
+-- 2. Cấu hình CAST (Ép kiểu) để Hibernate nói chuyện được với Postgres Enum
+CREATE CAST (varchar AS workshop_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS summary_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS registration_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS notification_type) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS notification_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS transaction_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS sync_status) WITH INOUT AS IMPLICIT;
+
+-- 3. Tạo các bảng
 CREATE TABLE students (
     mssv VARCHAR(20) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -67,6 +76,7 @@ CREATE TABLE notifications (
     status notification_status DEFAULT 'PENDING',
     error_message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    workshop_id UUID,
     sent_at TIMESTAMP WITH TIME ZONE
 );
 
@@ -89,15 +99,15 @@ CREATE TABLE audit_logs (
     ip_address VARCHAR(45)
 );
 
--- Indices for performance
+-- 4. Indices
 CREATE INDEX idx_registrations_student ON registrations(student_id);
 CREATE INDEX idx_registrations_workshop ON registrations(workshop_id);
 CREATE INDEX idx_workshops_status ON workshops(status);
 CREATE INDEX idx_notifications_status ON notifications(status);
 
--- Seed Data
+-- 5. Seed Data
 INSERT INTO students (mssv, email, name, status) VALUES 
-('2312345', 'student1@unihub.com', 'Nguyen Van A', 'ACTIVE'),
+('2312345', 'ntcong120@gmail.com', 'Nguyen Van A', 'ACTIVE'),
 ('2312346', 'student2@unihub.com', 'Tran Thi B', 'ACTIVE');
 
 INSERT INTO workshops (id, name, speaker, room, max_seats, available_slots, start_time, end_time, is_paid, price, status) VALUES 

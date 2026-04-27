@@ -1,5 +1,6 @@
-package com.unihub.backend.core.config;
+package com.unihubworkshop.worker.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -8,6 +9,11 @@ import java.util.Properties;
 
 @Configuration
 public class MailConfig {
+    @Value("${MAIL_PASSWORD:dummy_password}")
+    private String password;
+
+    @Value("${MAIL_USERNAME:dummy_user@gmail.com}")
+    private String username;
 
     @Bean
     public JavaMailSender javaMailSender() {
@@ -15,8 +21,8 @@ public class MailConfig {
         mailSender.setHost("smtp.gmail.com");
         mailSender.setPort(587);
 
-        mailSender.setUsername("[EMAIL_ADDRESS]");
-        mailSender.setPassword("[PASSWORD]");
+        mailSender.setUsername(username);
+        mailSender.setPassword(password);
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
