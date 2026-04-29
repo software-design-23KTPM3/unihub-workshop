@@ -18,6 +18,19 @@ function buildUrl(endpoint, query) {
 }
 
 function getAuthToken() {
+  const key = 'oidc.user:http://localhost:8080/realms/unihub:unihub-client';
+  const oidcStorage = sessionStorage.getItem(key) || localStorage.getItem(key);
+  
+  if (oidcStorage) {
+    try {
+      const user = JSON.parse(oidcStorage);
+      return user?.access_token || null;
+    } catch (e) {
+      console.error('Failed to parse OIDC user from storage', e);
+    }
+  }
+  
+  // Fallback for old mechanism
   const currentUser = storage.get(AUTH_USER_KEY);
   return currentUser?.token || currentUser?.accessToken || null;
 }

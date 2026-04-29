@@ -5,31 +5,22 @@
     "realm": [
       {
         "name": "STUDENT",
-        "description": "Participating students"
+        "description": "General student access"
       },
       {
         "name": "ORGANIZER",
-        "description": "Workshop organizers/admins"
+        "description": "Workshop organizers"
       },
       {
-        "name": "CHECKIN_STAFF",
-        "description": "Staff at workshop doors"
+        "name": "STAFF",
+        "description": "Event and check-in staff"
       }
     ]
   },
   "clients": [
     {
-      "clientId": "unihub-backend",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "secret": "backend-secret-xyz",
-      "redirectUris": [],
-      "webOrigins": [],
-      "bearerOnly": true
-    },
-    {
       "clientId": "unihub-client",
+      "name": "Web and Mobile Frontend",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -37,8 +28,25 @@
         "http://localhost:3000/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
-      ]
+        "http://localhost:3000",
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "user-sync-service",
+      "name": "User Management Admin App",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "super-secure-sync-secret-123",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
     }
   ],
   "users": [
