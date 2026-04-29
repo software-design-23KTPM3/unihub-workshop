@@ -57,3 +57,5 @@ db-data/
 postgres-data/
 mysql-data/
 redis-data/
+
+backend-core/target/
