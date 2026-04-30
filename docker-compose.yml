@@ -74,6 +74,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs
@@ -92,6 +93,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs
@@ -110,6 +112,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs

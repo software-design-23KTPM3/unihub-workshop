@@ -29,8 +29,14 @@ CREATE TABLE students (
 CREATE TABLE workshops (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    description TEXT,
     speaker VARCHAR(255),
+    speaker_title VARCHAR(255),
+    topic VARCHAR(255),
     room VARCHAR(100),
+    room_map_text TEXT,
+    tags TEXT,
+    organizer_id VARCHAR(255),
     max_seats INTEGER NOT NULL,
     available_slots INTEGER NOT NULL,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -103,6 +109,7 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_registrations_student ON registrations(student_id);
 CREATE INDEX idx_registrations_workshop ON registrations(workshop_id);
 CREATE INDEX idx_workshops_status ON workshops(status);
+CREATE INDEX idx_workshops_organizer ON workshops(organizer_id);
 CREATE INDEX idx_notifications_status ON notifications(status);
 
 -- 5. Seed Data

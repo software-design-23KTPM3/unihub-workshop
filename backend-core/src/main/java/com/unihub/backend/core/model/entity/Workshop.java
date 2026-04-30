@@ -20,8 +20,18 @@ public class Workshop {
     @Column(nullable = false)
     private String name;
 
+    private String description;
     private String speaker;
+    @Column(name = "speaker_title")
+    private String speakerTitle;
+    private String topic;
     private String room;
+    @Column(name = "room_map_text")
+    private String roomMapText;
+    private String tags;
+
+    @Column(name = "organizer_id")
+    private String organizerId;
 
     @Column(name = "max_seats", nullable = false)
     private Integer maxSeats;
@@ -63,11 +73,17 @@ public class Workshop {
 
     public Workshop() {}
 
-    public Workshop(UUID id, String name, String speaker, String room, Integer maxSeats, Integer availableSlots, ZonedDateTime startTime, ZonedDateTime endTime, Boolean isPaid, BigDecimal price, WorkshopStatus status, SummaryStatus summaryStatus) {
+    public Workshop(UUID id, String name, String description, String speaker, String speakerTitle, String topic, String room, String roomMapText, String tags, String organizerId, Integer maxSeats, Integer availableSlots, ZonedDateTime startTime, ZonedDateTime endTime, Boolean isPaid, BigDecimal price, WorkshopStatus status, SummaryStatus summaryStatus) {
         this.id = id;
         this.name = name;
+        this.description = description;
         this.speaker = speaker;
+        this.speakerTitle = speakerTitle;
+        this.topic = topic;
         this.room = room;
+        this.roomMapText = roomMapText;
+        this.tags = tags;
+        this.organizerId = organizerId;
         this.maxSeats = maxSeats;
         this.availableSlots = availableSlots;
         this.startTime = startTime;
@@ -82,10 +98,22 @@ public class Workshop {
     public void setId(UUID id) { this.id = id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public String getSpeaker() { return speaker; }
     public void setSpeaker(String speaker) { this.speaker = speaker; }
+    public String getSpeakerTitle() { return speakerTitle; }
+    public void setSpeakerTitle(String speakerTitle) { this.speakerTitle = speakerTitle; }
+    public String getTopic() { return topic; }
+    public void setTopic(String topic) { this.topic = topic; }
     public String getRoom() { return room; }
     public void setRoom(String room) { this.room = room; }
+    public String getRoomMapText() { return roomMapText; }
+    public void setRoomMapText(String roomMapText) { this.roomMapText = roomMapText; }
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+    public String getOrganizerId() { return organizerId; }
+    public void setOrganizerId(String organizerId) { this.organizerId = organizerId; }
     public Integer getMaxSeats() { return maxSeats; }
     public void setMaxSeats(Integer maxSeats) { this.maxSeats = maxSeats; }
     public Integer getAvailableSlots() { return availableSlots; }
@@ -111,8 +139,14 @@ public class Workshop {
 
     public static class WorkshopBuilder {
         private String name;
+        private String description;
         private String speaker;
+        private String speakerTitle;
+        private String topic;
         private String room;
+        private String roomMapText;
+        private String tags;
+        private String organizerId;
         private Integer maxSeats;
         private Integer availableSlots;
         private ZonedDateTime startTime;
@@ -123,8 +157,14 @@ public class Workshop {
         private SummaryStatus summaryStatus;
 
         public WorkshopBuilder name(String name) { this.name = name; return this; }
+        public WorkshopBuilder description(String description) { this.description = description; return this; }
         public WorkshopBuilder speaker(String speaker) { this.speaker = speaker; return this; }
+        public WorkshopBuilder speakerTitle(String speakerTitle) { this.speakerTitle = speakerTitle; return this; }
+        public WorkshopBuilder topic(String topic) { this.topic = topic; return this; }
         public WorkshopBuilder room(String room) { this.room = room; return this; }
+        public WorkshopBuilder roomMapText(String roomMapText) { this.roomMapText = roomMapText; return this; }
+        public WorkshopBuilder tags(String tags) { this.tags = tags; return this; }
+        public WorkshopBuilder organizerId(String organizerId) { this.organizerId = organizerId; return this; }
         public WorkshopBuilder maxSeats(Integer maxSeats) { this.maxSeats = maxSeats; return this; }
         public WorkshopBuilder availableSlots(Integer availableSlots) { this.availableSlots = availableSlots; return this; }
         public WorkshopBuilder startTime(ZonedDateTime startTime) { this.startTime = startTime; return this; }
@@ -134,7 +174,7 @@ public class Workshop {
         public WorkshopBuilder status(WorkshopStatus status) { this.status = status; return this; }
         public WorkshopBuilder summaryStatus(SummaryStatus summaryStatus) { this.summaryStatus = summaryStatus; return this; }
         public Workshop build() {
-            return new Workshop(null, name, speaker, room, maxSeats, availableSlots, startTime, endTime, isPaid, price, status, summaryStatus);
+            return new Workshop(null, name, description, speaker, speakerTitle, topic, room, roomMapText, tags, organizerId, maxSeats, availableSlots, startTime, endTime, isPaid, price, status, summaryStatus);
         }
     }
 }

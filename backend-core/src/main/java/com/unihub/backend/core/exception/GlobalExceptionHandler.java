@@ -17,7 +17,22 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.FORBIDDEN, request);
+        return buildErrorResponse(ex.getMessage(), "ACCESS_DENIED", HttpStatus.FORBIDDEN, request);
+    }
+
+    @ExceptionHandler(WorkshopAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleWorkshopAccessDenied(WorkshopAccessDeniedException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "WORKSHOP_ACCESS_DENIED", HttpStatus.FORBIDDEN, request);
+    }
+
+    @ExceptionHandler(WorkshopNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleWorkshopNotFound(WorkshopNotFoundException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "WORKSHOP_NOT_FOUND", HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(InvalidWorkshopException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidWorkshop(InvalidWorkshopException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "INVALID_WORKSHOP", HttpStatus.BAD_REQUEST, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -25,17 +40,18 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        return buildErrorResponse(message, HttpStatus.UNPROCESSABLE_ENTITY, request);
+        return buildErrorResponse(message, "VALIDATION_ERROR", HttpStatus.UNPROCESSABLE_ENTITY, request);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, request);
+        return buildErrorResponse(ex.getMessage(), "INTERNAL_SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
-    private ResponseEntity<ErrorResponse> buildErrorResponse(String message, HttpStatus status, HttpServletRequest request) {
+    private ResponseEntity<ErrorResponse> buildErrorResponse(String message, String code, HttpStatus status, HttpServletRequest request) {
         ErrorResponse error = ErrorResponse.builder()
                 .message(message)
+                .code(code)
                 .status(status.value())
                 .timestamp(ZonedDateTime.now())
                 .path(request.getRequestURI())
