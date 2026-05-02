@@ -1,6 +1,28 @@
 {
   "realm": "unihub",
   "enabled": true,
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "user-sync-service",
+        "roles": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-realm",
+          "realm-admin"
+        ]
+      }
+    ]
+  },
+  "scopeMappings": [
+    {
+      "clientScope": "offline_access",
+      "roles": [
+        "offline_access"
+      ]
+    }
+  ],
   "roles": {
     "realm": [
       {
@@ -33,7 +55,23 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles mapping",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "multivalued": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     },
     {
       "clientId": "user-sync-service",
@@ -45,11 +83,27 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "super-secure-sync-secret-123",
       "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false
     }
   ],
   "users": [
+    {
+      "username": "service-account-user-sync-service",
+      "enabled": true,
+      "serviceAccountClientId": "user-sync-service",
+      "clientRoles": {
+        "realm-management": [
+          "realm-admin",
+          "manage-users",
+          "view-users",
+          "query-users",
+          "assign-roles",
+          "view-realm"
+        ]
+      }
+    },
     {
       "username": "student_test",
       "enabled": true,

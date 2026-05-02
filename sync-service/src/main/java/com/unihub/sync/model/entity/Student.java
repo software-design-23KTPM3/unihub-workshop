@@ -1,4 +1,4 @@
-package com.unihub.backend.core.model.entity;
+package com.unihub.sync.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -15,15 +15,21 @@ import java.time.ZonedDateTime;
 public class Student {
     @Id
     private String mssv;
+    
     @Column(unique = true, nullable = false)
     private String email;
+    
     @Column(nullable = false)
     private String name;
+    
     private String birthday;
+
     private String status;
+    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
+    
     @UpdateTimestamp
     @Column(name = "updated_at")
     private ZonedDateTime updatedAt;

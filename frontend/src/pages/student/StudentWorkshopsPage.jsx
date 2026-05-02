@@ -108,7 +108,7 @@ export default function StudentWorkshopsPage() {
         description="Lọc theo chủ đề, ngày, phòng và trạng thái để chọn phiên phù hợp."
       />
 
-      <div style={{ padding: '0 24px', marginBottom: 16 }}>
+      {/* <div style={{ padding: '0 24px', marginBottom: 16 }}>
         <Button 
           type="primary" 
           danger 
@@ -117,7 +117,7 @@ export default function StudentWorkshopsPage() {
         >
           Run Stress Test API
         </Button>
-      </div>
+      </div> */}
 
       <WorkshopFilterBar
         topics={topics}

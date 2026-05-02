@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   redis-rate:
@@ -122,6 +122,25 @@ services:
       - rabbitmq
       - keycloak
 
+  sync-service:
+    build: ./sync-service
+    container_name: unihub-sync-service
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - APP_KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - APP_KEYCLOAK_REALM=unihub
+      - APP_KEYCLOAK_CLIENT_ID=user-sync-service
+      - APP_KEYCLOAK_CLIENT_SECRET=super-secure-sync-secret-123
+      - APP_SYNC_CSV_PATH=/data
+      - APP_SYNC_ARCHIVE_PATH=/data/archive
+    volumes:
+      - ./data:/data
+    depends_on:
+      - postgres
+      - keycloak
+
   frontend:
     build: ./frontend
     container_name: unihub-frontend
@@ -129,6 +148,13 @@ services:
       - "3000:80"
     depends_on:
       - gateway
+
+  adminer:
+    image: adminer
+    container_name: unihub-adminer
+    restart: always
+    ports:
+      - 8082:8080
 
 volumes:
   postgres_data:

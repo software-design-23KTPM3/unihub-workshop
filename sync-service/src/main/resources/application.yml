@@ -1,0 +1,24 @@
+spring:
+  main:
+    web-application-type: none
+  application:
+    name: sync-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/unihub_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+app:
+  sync:
+    csv-path: ${APP_SYNC_CSV_PATH:/data}
+    archive-path: ${APP_SYNC_ARCHIVE_PATH:/data/archive}
+    cron: ${APP_SYNC_CRON:0 0 2 * * *}
+  keycloak:
+    server-url: ${APP_KEYCLOAK_SERVER_URL:http://localhost:8080}
+    realm: ${APP_KEYCLOAK_REALM:unihub}
+    client-id: ${APP_KEYCLOAK_CLIENT_ID:user-sync-service}
+    client-secret: ${APP_KEYCLOAK_CLIENT_SECRET:super-secure-sync-secret-123}

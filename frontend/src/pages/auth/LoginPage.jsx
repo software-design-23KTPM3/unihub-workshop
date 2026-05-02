@@ -10,19 +10,37 @@ const roleTargets = {
 };
 
 export default function LoginPage() {
-  const { currentUser, login, isLoading, error } = useAuth();
+  const { currentUser, login, isAuthenticated, isLoading, error } = useAuth();
   const location = useLocation();
-
+  const from = location.state?.from?.pathname;
+  
   if (isLoading) {
-    return <div>Đang tải...</div>;
+    return (
+      <div className="login-loading">
+        <Card bordered={false} className="auth-card">
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Typography.Title level={3}>Đang xác thực...</Typography.Title>
+            <Typography.Paragraph>Vui lòng đợi trong giây lát khi hệ thống xử lý.</Typography.Paragraph>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   if (error) {
-    return <div>Lỗi xác thực: {error.message}</div>;
+    return (
+      <div className="login-error">
+        <Card bordered={false} className="auth-card">
+          <Typography.Title level={3} type="danger">Lỗi xác thực</Typography.Title>
+          <Typography.Paragraph>{error.message}</Typography.Paragraph>
+          <Button onClick={() => window.location.href = '/login'}>Thử lại</Button>
+        </Card>
+      </div>
+    );
   }
 
-  if (currentUser) {
-    const target = roleTargets[currentUser.role] || '/';
+  if (isAuthenticated && currentUser) {
+    const target = from || roleTargets[currentUser.role] || '/';
     return <Navigate to={target} replace />;
   }
 
