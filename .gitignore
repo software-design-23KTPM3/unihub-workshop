@@ -59,3 +59,5 @@ mysql-data/
 redis-data/
 
 backend-core/target/
+
+uploads/

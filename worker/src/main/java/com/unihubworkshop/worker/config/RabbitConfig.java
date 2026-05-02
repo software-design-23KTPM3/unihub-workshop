@@ -1,4 +1,4 @@
-package com.unihub.backend.core.config;
+package com.unihubworkshop.worker.config;
 
 import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;

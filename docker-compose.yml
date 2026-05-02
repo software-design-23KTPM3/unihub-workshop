@@ -83,6 +83,8 @@ services:
       - redis-lock
       - rabbitmq
       - keycloak
+    volumes:
+      - ./uploads:/app/uploads
 
   backend2:
     build: ./backend-core
@@ -102,6 +104,8 @@ services:
       - redis-lock
       - rabbitmq
       - keycloak
+    volumes:
+      - ./uploads:/app/uploads
 
   backend3:
     build: ./backend-core
@@ -121,6 +125,8 @@ services:
       - redis-lock
       - rabbitmq
       - keycloak
+    volumes:
+      - ./uploads:/app/uploads
 
   sync-service:
     build: ./sync-service

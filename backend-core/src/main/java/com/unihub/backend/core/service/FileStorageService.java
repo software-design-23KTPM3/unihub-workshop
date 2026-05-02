@@ -12,7 +12,7 @@ import java.util.UUID;
 @Service
 public class FileStorageService {
 
-    private final Path root = Paths.get("data/uploads");
+    private final Path root = Paths.get("uploads");
 
     public FileStorageService() throws IOException {
         if (!Files.exists(root)) {
@@ -24,7 +24,7 @@ public class FileStorageService {
         try {
             String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
             Files.copy(file.getInputStream(), this.root.resolve(filename));
-            return "/uploads/" + filename;
+            return "uploads/" + filename;
         } catch (Exception e) {
             throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
         }

@@ -100,7 +100,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                                 .build();
 
                 rabbitTemplate.convertAndSend(
-                                RabbitConfig.REGISTRATION_EXCHANGE,
+                                RabbitConfig.NOTIFICATION_EXCHANGE,
                                 RabbitConfig.NOTIFICATION_ROUTING_KEY,
                                 notificationRequest);
 

@@ -1,5 +1,6 @@
 package com.unihub.backend.core.service.impl;
 
+import com.unihub.backend.core.config.RabbitConfig;
 import com.unihub.backend.core.exception.InvalidWorkshopException;
 import com.unihub.backend.core.exception.WorkshopAccessDeniedException;
 import com.unihub.backend.core.exception.WorkshopNotFoundException;
@@ -17,6 +18,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -47,9 +50,9 @@ public class WorkshopServiceImpl implements WorkshopService {
     private final FileStorageService fileStorageService;
 
     public WorkshopServiceImpl(WorkshopRepository workshopRepository,
-                               StringRedisTemplate redisTemplate,
-                               RabbitTemplate rabbitTemplate,
-                               FileStorageService fileStorageService) {
+            StringRedisTemplate redisTemplate,
+            RabbitTemplate rabbitTemplate,
+            FileStorageService fileStorageService) {
         this.workshopRepository = workshopRepository;
         this.redisTemplate = redisTemplate;
         this.rabbitTemplate = rabbitTemplate;
@@ -75,7 +78,7 @@ public class WorkshopServiceImpl implements WorkshopService {
 
     @Override
     @Transactional
-    public WorkshopResponse createWorkshop(WorkshopRequest request, Authentication authentication) {
+    public WorkshopResponse createWorkshop(WorkshopRequest request, MultipartFile file, Authentication authentication) {
         validateRequest(request);
 
         Workshop workshop = Workshop.builder()
@@ -100,7 +103,13 @@ public class WorkshopServiceImpl implements WorkshopService {
         workshop.setSummaryText(request.getAiSummary());
 
         workshop = workshopRepository.save(workshop);
-        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(), String.valueOf(workshop.getAvailableSlots()));
+        
+        if (file != null && !file.isEmpty()) {
+            handlePdfUpload(workshop, file);
+        }
+
+        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(),
+                String.valueOf(workshop.getAvailableSlots()));
         rabbitTemplate.convertAndSend("workshop.exchange", "workshop.created", workshop.getId().toString());
         invalidateCache(workshop.getId());
 
@@ -109,7 +118,7 @@ public class WorkshopServiceImpl implements WorkshopService {
 
     @Override
     @Transactional
-    public WorkshopResponse updateWorkshop(UUID id, WorkshopRequest request, Authentication authentication) {
+    public WorkshopResponse updateWorkshop(UUID id, WorkshopRequest request, MultipartFile file, Authentication authentication) {
         validateRequest(request);
 
         Workshop workshop = findWorkshop(id);
@@ -137,8 +146,13 @@ public class WorkshopServiceImpl implements WorkshopService {
         workshop.setPrice(request.getPrice());
         workshop.setSummaryText(request.getAiSummary());
 
+        if (file != null && !file.isEmpty()) {
+            handlePdfUpload(workshop, file);
+        }
+
         workshop = workshopRepository.save(workshop);
-        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(), String.valueOf(workshop.getAvailableSlots()));
+        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(),
+                String.valueOf(workshop.getAvailableSlots()));
         invalidateCache(workshop.getId());
 
         return mapToResponse(workshop);
@@ -165,13 +179,23 @@ public class WorkshopServiceImpl implements WorkshopService {
     @Transactional
     public void uploadPdf(UUID id, MultipartFile file) {
         Workshop workshop = findWorkshop(id);
+        handlePdfUpload(workshop, file);
+        workshopRepository.save(workshop);
+    }
 
+    private void handlePdfUpload(Workshop workshop, MultipartFile file) {
         String path = fileStorageService.save(file);
         workshop.setPdfUrl(path);
         workshop.setSummaryStatus(SummaryStatus.PENDING);
-        workshopRepository.save(workshop);
 
-        rabbitTemplate.convertAndSend("workshop.exchange", "workshop.pdf.uploaded", id.toString());
+        UUID id = workshop.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                rabbitTemplate.convertAndSend(RabbitConfig.AI_SUMMARY_EXCHANGE, RabbitConfig.AI_SUMMARY_ROUTING_KEY,
+                        id.toString());
+            }
+        });
     }
 
     private Workshop findWorkshop(UUID id) {
@@ -186,7 +210,8 @@ public class WorkshopServiceImpl implements WorkshopService {
         if (request.getCapacity() == null || request.getCapacity() <= 0) {
             throw new InvalidWorkshopException("Capacity must be greater than 0");
         }
-        if (request.getStartTime() == null || request.getEndTime() == null || !request.getStartTime().isBefore(request.getEndTime())) {
+        if (request.getStartTime() == null || request.getEndTime() == null
+                || !request.getStartTime().isBefore(request.getEndTime())) {
             throw new InvalidWorkshopException("Start time must be before end time");
         }
         if (request.getDate() == null) {
@@ -303,7 +328,8 @@ public class WorkshopServiceImpl implements WorkshopService {
         if (!matchesNormalized(workshop.getStatus(), filters.get("status"))) {
             return false;
         }
-        if (filters.get("date") != null && !filters.get("date").isBlank() && !filters.get("date").equals(workshop.getDate())) {
+        if (filters.get("date") != null && !filters.get("date").isBlank()
+                && !filters.get("date").equals(workshop.getDate())) {
             return false;
         }
         if (filters.get("isPaid") != null && !filters.get("isPaid").isBlank()) {

@@ -9,11 +9,11 @@ import java.util.Properties;
 
 @Configuration
 public class MailConfig {
-    @Value("${MAIL_PASSWORD:dummy_password}")
-    private String password;
-
-    @Value("${MAIL_USERNAME:dummy_user@gmail.com}")
+    @Value("${spring.mail.username}")
     private String username;
+
+    @Value("${spring.mail.password}")
+    private String password;
 
     @Bean
     public JavaMailSender javaMailSender() {
