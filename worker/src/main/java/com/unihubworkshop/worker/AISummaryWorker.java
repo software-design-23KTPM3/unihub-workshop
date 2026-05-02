@@ -23,6 +23,7 @@ import java.util.UUID;
 public class AISummaryWorker {
 
     private static final Logger log = LoggerFactory.getLogger(AISummaryWorker.class);
+    private static final int TEXT_THRESHOLD = 100000;
 
     private final WorkshopRepository workshopRepository;
     private final AISummaryService aiSummaryService;
@@ -34,105 +35,75 @@ public class AISummaryWorker {
 
     @RabbitListener(queues = RabbitConfig.AI_SUMMARY_QUEUE)
     public void processPdf(String workshopId) throws InterruptedException {
-        // 1. Làm sạch ID và tìm kiếm Workshop
         String cleanId = workshopId.replace("\"", "");
-        log.info(">>> [BẮT ĐẦU] Xử lý AI cho Workshop ID: {}", cleanId);
+        log.info(">>> [START] AI Processing for Workshop: {}", cleanId);
 
         Workshop workshop = workshopRepository.findById(UUID.fromString(cleanId)).orElse(null);
-
         if (workshop == null || workshop.getPdfUrl() == null) {
-            log.warn("!!! Không tìm thấy Workshop hoặc đường dẫn PDF cho ID: {}", cleanId);
+            log.warn("!!! Workshop or PDF path not found for ID: {}", cleanId);
             return;
         }
 
-        // 2. Cập nhật trạng thái đang xử lý
-        workshop.setSummaryStatus(SummaryStatus.PROCESSING);
-        workshopRepository.save(workshop);
+        updateStatus(workshop, SummaryStatus.PROCESSING);
 
         try {
-            // 3. Trích xuất văn bản từ PDF
-            String extractedText = extractTextFromPdf(workshop.getPdfUrl());
-            log.info("--- Đã trích xuất ban đầu: {} ký tự", extractedText.length());
+            String summary = generateSummaryForWorkshop(workshop);
 
-            String cleanText = cleanText(extractedText);
-            log.info("--- Sau khi làm sạch còn: {} ký tự", cleanText.length());
-            String summary;
-
-            // Đặt ngưỡng an toàn là 5000 ký tự (~1200 chữ)
-            int threshold = 5000;
-
-            // 4. Gọi AI để tóm tắt
-            if (cleanText.length() <= threshold) {
-                log.info("--- Gửi yêu cầu tóm tắt (Văn bản ngắn)...");
-                summary = aiSummaryService.generateResponse(cleanText);
-
-                // Tăng thời gian nghỉ lên 5s cho bản 2.0-flash
-                Thread.sleep(5000);
-            } else {
-                log.info("--- Văn bản dài, bắt đầu chia nhỏ (mỗi phần {} ký tự)...", threshold);
-                List<String> chunks = chunkText(cleanText, threshold);
-                StringBuilder combinedSummary = new StringBuilder();
-
-                for (int i = 0; i < chunks.size(); i++) {
-                    log.info("--- Đang xử lý phần {}/{}", i + 1, chunks.size());
-                    String chunkSummary = aiSummaryService.generateResponse(chunks.get(i));
-                    combinedSummary.append(chunkSummary).append("\n");
-
-                    // Nghỉ 10 giây giữa các phần để đảm bảo an toàn cho Quota
-                    Thread.sleep(10000);
-                }
-                summary = combinedSummary.toString();
-            }
-
-            // 5. Lưu kết quả thành công
             workshop.setSummaryText(summary);
             workshop.setSummaryStatus(SummaryStatus.COMPLETED);
-            log.info(">>> [THÀNH CÔNG] Workshop ID: {} đã hoàn thành tóm tắt.", cleanId);
+            log.info("--- SUMMARY RESULT:\n{}\n---", summary);
+            log.info(">>> [SUCCESS] AI Summary completed for ID: {}", cleanId);
 
         } catch (Exception e) {
-            // 6. Xử lý lỗi đặc biệt: Truy tìm lỗi 429 ẩn sâu bên trong (Nested Exception)
-            boolean isQuotaError = false;
-            Throwable cause = e;
-            while (cause != null) {
-                String msg = cause.getMessage() != null ? cause.getMessage().toLowerCase() : "";
-                if (msg.contains("429") || msg.contains("quota")) {
-                    isQuotaError = true;
-                    break;
-                }
-                cause = cause.getCause();
-            }
-
-            if (isQuotaError) {
-                log.error("!!! CHẠM NGƯỠNG QUOTA: Google đang chặn yêu cầu của bạn.");
-                log.error("--- Worker sẽ ngủ đông 65 giây để hồi Quota...");
-
-                workshop.setSummaryStatus(SummaryStatus.FAILED);
-                workshopRepository.save(workshop);
-
-                Thread.sleep(65000); // Bắt buộc ngủ 65 giây
-                return; // Thoát để không lưu đè trạng thái
-            } else {
-                log.error("!!! LỖI XỬ LÝ AI KHÁC: ", e);
-                workshop.setSummaryStatus(SummaryStatus.FAILED);
-            }
+            log.error("!!! AI PROCESSING ERROR for ID {}: ", cleanId, e);
+            workshop.setSummaryStatus(SummaryStatus.FAILED);
         }
 
-        // Lưu trạng thái lỗi (nếu không phải lỗi Quota)
+        workshopRepository.save(workshop);
+    }
+
+    private String generateSummaryForWorkshop(Workshop workshop) throws IOException, InterruptedException {
+        String extractedText = extractTextFromPdf(workshop.getPdfUrl());
+        String cleanText = cleanText(extractedText);
+        log.info("--- Text extracted: {} chars (Cleaned: {} chars)", extractedText.length(), cleanText.length());
+
+        if (cleanText.length() <= TEXT_THRESHOLD) {
+            return aiSummaryService.generateResponse(cleanText);
+        } else {
+            return processChunkedText(cleanText);
+        }
+    }
+
+    private String processChunkedText(String text) throws InterruptedException {
+        log.info("--- Large text detected, processing in chunks...");
+        List<String> chunks = chunkText(text, TEXT_THRESHOLD);
+        StringBuilder combinedSummary = new StringBuilder();
+
+        for (int i = 0; i < chunks.size(); i++) {
+            log.info("--- Processing chunk {}/{}", i + 1, chunks.size());
+            combinedSummary.append(aiSummaryService.generateResponse(chunks.get(i))).append("\n");
+            if (i < chunks.size() - 1)
+                Thread.sleep(5000);
+        }
+        return combinedSummary.toString();
+    }
+
+    private void updateStatus(Workshop workshop, SummaryStatus status) {
+        workshop.setSummaryStatus(status);
         workshopRepository.save(workshop);
     }
 
     private String cleanText(String text) {
-        if (text == null) return "";
-        return text
-                .replaceAll("(?m)^\\s*[0-9]+\\s*$", "") // Xóa số trang đứng một mình
-                .replaceAll("(?i)trang\\s+[0-9]+/[0-9]+", "") // Xóa chữ "Trang X/Y"
-                .replaceAll("[\\r\\n]+", " ") // Chuyển các dấu xuống dòng thành khoảng trắng
-                .replaceAll("\\s{2,}", " ") // Xóa khoảng trắng dư thừa (chỉ giữ 1 dấu cách)
-                .replaceAll("[^\\p{L}\\p{N}\\p{P}\\p{Z}]", "") // Xóa các ký tự biểu tượng lạ
+        if (text == null)
+            return "";
+        return text.replaceAll("(?m)^\\s*[0-9]+\\s*$", "")
+                .replaceAll("(?i)trang\\s+[0-9]+/[0-9]+", "")
+                .replaceAll("[\\r\\n]+", " ")
+                .replaceAll("\\s{2,}", " ")
+                .replaceAll("[^\\p{L}\\p{N}\\p{P}\\p{Z}]", "")
                 .trim();
     }
 
-    // Đã thêm tham số chunkSize để dùng linh hoạt với biến threshold
     private List<String> chunkText(String text, int chunkSize) {
         List<String> chunks = new ArrayList<>();
         for (int i = 0; i < text.length(); i += chunkSize) {
@@ -146,10 +117,9 @@ public class AISummaryWorker {
             byte[] bytes = is.readAllBytes();
             try (PDDocument document = Loader.loadPDF(bytes)) {
                 if (!document.isEncrypted()) {
-                    PDFTextStripper stripper = new PDFTextStripper();
-                    return stripper.getText(document);
+                    return new PDFTextStripper().getText(document);
                 }
-                return "[PDF bị mã hóa - Không thể trích xuất văn bản]";
+                return "[PDF Encrypted - Text extraction failed]";
             }
         }
     }
@@ -161,7 +131,8 @@ public class AISummaryWorker {
             File file = new File(path);
             if (!file.exists()) {
                 File parentFile = new File("..", path);
-                if (parentFile.exists()) return new FileInputStream(parentFile);
+                if (parentFile.exists())
+                    return new FileInputStream(parentFile);
             }
             return new FileInputStream(file);
         }
