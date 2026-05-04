@@ -4,15 +4,38 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Button, Card, Progress, Space, Tag, Typography } from 'antd';
-import { Link } from 'react-router-dom';
+import { Button, Card, Progress, Space, Tag, Typography, message } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import StatusBadge from '../common/StatusBadge.jsx';
 import { formatDate, formatMoney } from '../../utils/formatters.js';
+import { registerWorkshop } from '../../services/registrationService.js';
 
 export default function WorkshopCard({ workshop }) {
+  const navigate = useNavigate();
+  const [registering, setRegistering] = useState(false);
   const remainingSeats = Math.max(workshop.capacity - workshop.registeredCount, 0);
   const fillPercent = Math.round((workshop.registeredCount / workshop.capacity) * 100);
   const isUnavailable = workshop.status === 'FULL' || workshop.status === 'CANCELLED';
+
+  const handleQuickRegister = async () => {
+    if (workshop.isPaid) {
+      // Redirect to detail page for paid workshops to handle payment
+      navigate(`/student/workshops/${workshop.id}`);
+      return;
+    }
+
+    setRegistering(true);
+    try {
+      const registration = await registerWorkshop(workshop.id);
+      message.success('Đăng ký workshop thành công!');
+      navigate(`/student/tickets/${registration.registrationId || registration.id}`);
+    } catch (err) {
+      message.error(err.message || 'Đăng ký thất bại');
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   return (
     <Card className="workshop-card" bordered={false}>
@@ -62,7 +85,13 @@ export default function WorkshopCard({ workshop }) {
           <Link to={`/student/workshops/${workshop.id}`}>
             <Button type="primary">Xem chi tiết</Button>
           </Link>
-          <Button disabled={isUnavailable}>Đăng ký</Button>
+          <Button 
+            disabled={isUnavailable}
+            loading={registering}
+            onClick={handleQuickRegister}
+          >
+            Đăng ký
+          </Button>
         </div>
       </Space>
     </Card>

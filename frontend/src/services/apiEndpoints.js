@@ -1,7 +1,4 @@
 export const API_ENDPOINTS = {
-  auth: {
-    login: '/auth/login',
-  },
   workshops: {
     list: '/workshops',
     detail: (id) => `/workshops/${id}`,

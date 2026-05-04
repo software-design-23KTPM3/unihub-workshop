@@ -1,76 +1,36 @@
-import { USE_MOCK } from '../config/api.js';
-import { mockUsers } from '../mocks/users.mock.js';
 import { storage } from '../utils/storage.js';
-import { API_ENDPOINTS } from './apiEndpoints.js';
-import { httpClient } from './httpClient.js';
 
-const AUTH_USER_KEY = 'unihub.auth.user';
-const SUPPORTED_ROLES = ['STUDENT', 'ORGANIZER'];
-
-function isSupportedRole(role) {
-  return SUPPORTED_ROLES.includes(role);
-}
-
-function sanitizeUser(user) {
-  if (!user) {
-    return null;
-  }
-
-  const { password, ...safeUser } = user;
-  return safeUser;
-}
-
-function persistUser(user) {
-  if (!isSupportedRole(user?.role)) {
-    throw new Error('Tài khoản không có quyền truy cập web UniHub Workshop.');
-  }
-
-  storage.set(AUTH_USER_KEY, user);
-  return user;
-}
-
-export async function login(email, password) {
-  if (!USE_MOCK) {
-    const response = await httpClient.post(API_ENDPOINTS.auth.login, { email, password });
-    const user = response.user || response;
-    const token = response.token || response.accessToken;
-    return persistUser(token ? { ...user, token } : user);
-  }
-
-  const normalizedEmail = email?.trim().toLowerCase();
-  const user = mockUsers.find(
-    (item) => item.email === normalizedEmail && item.password === password,
-  );
-
-  if (!user) {
-    throw new Error('Email hoặc mật khẩu không đúng.');
-  }
-
-  const safeUser = sanitizeUser(user);
-  return persistUser(safeUser);
-}
-
-export function getDemoAccounts() {
-  if (!USE_MOCK) {
-    return [];
-  }
-
-  return mockUsers.map(sanitizeUser);
-}
-
-export function logout() {
-  storage.remove(AUTH_USER_KEY);
-}
+const OIDC_KEY = 'oidc.user:http://localhost:8080/realms/unihub:unihub-client';
 
 export function getCurrentUser() {
-  const user = storage.get(AUTH_USER_KEY);
+  const oidcStorage = sessionStorage.getItem(OIDC_KEY) || localStorage.getItem(OIDC_KEY);
+  
+  if (oidcStorage) {
+    try {
+      const oidcUser = JSON.parse(oidcStorage);
+      const token = oidcUser.access_token;
+      
+      // Parse JWT for roles
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const roles = payload.realm_access?.roles || [];
+      const role = roles.includes('ORGANIZER') ? 'ORGANIZER' : roles.includes('STAFF') ? 'STAFF' : 'STUDENT';
 
-  if (user && !isSupportedRole(user.role)) {
-    storage.remove(AUTH_USER_KEY);
-    return null;
+      return {
+        ...oidcUser.profile,
+        id: oidcUser.profile.sub,
+        studentId: oidcUser.profile.preferred_username, // Map MSSV
+        email: oidcUser.profile.email,
+        name: oidcUser.profile.name || oidcUser.profile.preferred_username,
+        role: role,
+        roles: roles,
+        accessToken: token
+      };
+    } catch (e) {
+      console.error('Failed to parse OIDC user from storage', e);
+    }
   }
-
-  return user;
+  
+  return null;
 }
 
 export function isAuthenticated() {
@@ -79,6 +39,16 @@ export function isAuthenticated() {
 
 export function hasRole(allowedRoles) {
   const user = getCurrentUser();
+  if (!user) return false;
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  return Boolean(user && roles.includes(user.role));
+  return roles.includes(user.role) || user.roles.some(r => roles.includes(r));
+}
+
+// These are no longer needed for manual login but kept as empty for now to avoid breaking imports
+export async function login() {
+  console.warn('Manual login() called. This is deprecated. Use OIDC instead.');
+}
+
+export function logout() {
+  console.warn('Manual logout() called. This is deprecated. Use OIDC instead.');
 }

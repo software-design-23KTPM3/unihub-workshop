@@ -141,7 +141,7 @@ export default function StudentWorkshopDetailPage() {
 
   const handlePaymentSuccess = async () => {
     setPaymentStatus('success');
-    const paidRegistration = await completeMockPayment(paymentRegistration.id);
+    const paidRegistration = await completeMockPayment(paymentRegistration.registrationId);
     setMyRegistration(paidRegistration);
     setPaymentRegistration(null);
     navigate(`/student/tickets/${paidRegistration.id}`);
@@ -274,7 +274,7 @@ export default function StudentWorkshopDetailPage() {
           <Button
             key="ticket"
             type="primary"
-            onClick={() => navigate(`/student/tickets/${successRegistration?.id}`)}
+            onClick={() => navigate(`/student/tickets/${successRegistration?.registrationId}`)}
           >
             Xem ticket
           </Button>,

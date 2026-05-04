@@ -25,19 +25,9 @@ public class WorkshopController {
         this.workshopService = workshopService;
     }
 
-    @GetMapping("/v1/workshops")
-    public List<WorkshopResponse> getAllWorkshopsV1(Authentication authentication, @RequestParam Map<String, String> filters) {
-        return workshopService.getAllWorkshops(authentication, filters);
-    }
-
     @GetMapping("/workshops")
     public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters) {
         return workshopService.getAllWorkshops(authentication, filters);
-    }
-
-    @GetMapping("/v1/workshops/{id}")
-    public WorkshopResponse getWorkshopByIdV1(@PathVariable UUID id, Authentication authentication) {
-        return workshopService.getWorkshopById(id, authentication);
     }
 
     @GetMapping("/workshops/{id}")

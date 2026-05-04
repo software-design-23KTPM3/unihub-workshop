@@ -24,6 +24,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         private final RabbitTemplate rabbitTemplate;
         private final WorkshopRepository workshopRepository;
         private final StudentRepository studentRepository;
+        private final RegistrationRepository registrationRepository;
         private final AsyncDbService asyncDbService;
 
         public RegistrationServiceImpl(
@@ -31,60 +32,145 @@ public class RegistrationServiceImpl implements RegistrationService {
                         RabbitTemplate rabbitTemplate,
                         WorkshopRepository workshopRepository,
                         StudentRepository studentRepository,
+                        RegistrationRepository registrationRepository,
                         AsyncDbService asyncDbService) {
                 this.redisService = redisService;
                 this.rabbitTemplate = rabbitTemplate;
                 this.workshopRepository = workshopRepository;
                 this.studentRepository = studentRepository;
+                this.registrationRepository = registrationRepository;
                 this.asyncDbService = asyncDbService;
         }
 
         @Override
         @Transactional
-        public RegistrationResponse createRegistration(UUID idempotencyKey, RegistrationRequest request) {
+        public RegistrationResponse createRegistration(UUID idempotencyKeyFromHeader, RegistrationRequest request) {
+                // Lưu ý: idempotencyKeyFromHeader bị bỏ qua theo yêu cầu "gen dưới backend"
+                // Tuy nhiên ta có thể dùng userId + workshopId làm key tự nhiên trong Redis
+                
+                String studentMssv = request.getStudentId();
+                UUID workshopId = request.getWorkshopId();
+                UUID registrationId = UUID.randomUUID(); // Backend tự gen ID
 
-                if (!redisService.isUniqueRequest(idempotencyKey)) {
+                // 1. Kiểm tra và đăng ký trên Redis (Atomic: Check duplicate + Deduct slot)
+                if (!redisService.registerUserInRedis(workshopId, studentMssv)) {
+                        // Nếu thất bại, có thể là do hết chỗ hoặc đã đăng ký rồi
+                        if (redisService.isUserRegisteredInRedis(workshopId, studentMssv)) {
+                                return RegistrationResponse.builder()
+                                                .status(RegistrationStatus.FAILED)
+                                                .message("You have already registered for this workshop")
+                                                .build();
+                        }
                         return RegistrationResponse.builder()
-                                        .status(RegistrationStatus.PENDING)
-                                        .message("Request is already being processed or completed.")
+                                        .status(RegistrationStatus.FAILED)
+                                        .message("Workshop is sold out or unavailable")
                                         .build();
                 }
 
                 try {
-                        if (!redisService.deductWorkshopSlot(request.getWorkshopId())) {
-                                redisService.removeIdempotencyKey(idempotencyKey);
-                                return RegistrationResponse.builder()
-                                                .status(RegistrationStatus.FAILED)
-                                                .message("Workshop is sold out")
-                                                .build();
-                        }
-
-                        Workshop workshop = workshopRepository.findById(request.getWorkshopId())
+                        // 2. Lấy thông tin Workshop (để biết isPaid)
+                        Workshop workshop = workshopRepository.findById(workshopId)
                                         .orElseThrow(() -> new RuntimeException("Workshop not found"));
-                        Student student = studentRepository.findById(request.getStudentId())
+                        Student student = studentRepository.findById(studentMssv)
                                         .orElseThrow(() -> new RuntimeException("Student not found"));
 
-                        asyncDbService.saveRegistrationAsync(workshop, student, idempotencyKey);
+                        RegistrationStatus initialStatus = workshop.getIsPaid() ? RegistrationStatus.PENDING : RegistrationStatus.SUCCESS;
 
-                        log.info("Registration successful for student {} and workshop {}",
-                                        request.getStudentId(), request.getWorkshopId());
+                        // 3. Gọi Async lưu DB
+                        asyncDbService.saveRegistrationAsync(workshop, student, registrationId, initialStatus);
 
-                        sendNotification(workshop, student);
+                        log.info("Registration initiated in Redis for student {} and workshop {}. Async DB save triggered.",
+                                        studentMssv, workshopId);
 
+                        // 4. Trả về ngay lập tức
                         return RegistrationResponse.builder()
-                                        .registrationId(idempotencyKey)
-                                        .status(RegistrationStatus.PENDING)
-                                        .message("Registration successful. Notification sent.")
+                                        .registrationId(registrationId)
+                                        .status(initialStatus)
+                                        .message(initialStatus == RegistrationStatus.SUCCESS 
+                                                ? "Registration successful." 
+                                                : "Registration initiated. Please complete payment.")
                                         .build();
 
                 } catch (Exception e) {
                         log.error("Error during registration process: {}", e.getMessage());
-
-                        redisService.rollbackSlot(request.getWorkshopId());
-                        redisService.removeIdempotencyKey(idempotencyKey);
-
-                        throw new RuntimeException("Failed to process registration", e);
+                        // Rollback Redis nếu có lỗi nghiêm trọng khi chuẩn bị dữ liệu
+                        redisService.rollbackSlot(workshopId);
+                        // Cần thêm logic remove user khỏi set trong Redis nếu rollback
+                        throw new RuntimeException("Failed to initiate registration", e);
                 }
+        }
+
+        @Override
+        public java.util.List<RegistrationDetailResponse> getMyRegistrations(org.springframework.security.core.Authentication authentication) {
+                String mssv = authentication.getName();
+                return registrationRepository.findByStudentMssvOrderByCreatedAtDesc(mssv).stream()
+                                .map(this::mapToDetailResponse)
+                                .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
+        public java.util.List<RegistrationDetailResponse> getAllRegistrations(java.util.Map<String, String> filters) {
+                java.util.List<Registration> registrations;
+                if (filters.containsKey("workshopId")) {
+                        registrations = registrationRepository.findByWorkshopId(UUID.fromString(filters.get("workshopId")));
+                } else {
+                        registrations = registrationRepository.findAll();
+                }
+
+                return registrations.stream()
+                                .map(this::mapToDetailResponse)
+                                .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
+        public RegistrationDetailResponse getRegistrationById(UUID id) {
+                return registrationRepository.findById(id)
+                                .map(this::mapToDetailResponse)
+                                .orElseThrow(() -> new RuntimeException("Registration not found"));
+        }
+
+        @Override
+        @Transactional
+        public RegistrationDetailResponse confirmRegistration(UUID id) {
+                Registration registration = registrationRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Registration not found"));
+
+                if (registration.getStatus() != RegistrationStatus.SUCCESS) {
+                        registration.setStatus(RegistrationStatus.SUCCESS);
+                        registration = registrationRepository.save(registration);
+                        
+                        // Sau khi thanh toán thành công, gửi thông báo
+                        sendNotification(registration.getWorkshop(), registration.getStudent());
+                }
+
+                return mapToDetailResponse(registration);
+        }
+
+        private RegistrationDetailResponse mapToDetailResponse(Registration registration) {
+                Workshop workshop = registration.getWorkshop();
+                Student student = registration.getStudent();
+
+                WorkshopResponse workshopResponse = WorkshopResponse.builder()
+                                .id(workshop.getId())
+                                .title(workshop.getName())
+                                .speakerName(workshop.getSpeaker())
+                                .topic(workshop.getTopic())
+                                .room(workshop.getRoom())
+                                .date(workshop.getStartTime().toLocalDate().toString())
+                                .status(workshop.getStatus().toString())
+                                .build();
+
+                return RegistrationDetailResponse.builder()
+                                .id(registration.getId())
+                                .workshop(workshopResponse)
+                                .studentId(student.getMssv())
+                                .studentName(student.getName())
+                                .studentEmail(student.getEmail())
+                                .status(registration.getStatus())
+                                .qrCode(registration.getQrCode())
+                                .registeredAt(registration.getCreatedAt().toString())
+                                .paymentStatus(workshop.getIsPaid() ? "PENDING" : "FREE")
+                                .build();
         }
 
         private void sendNotification(Workshop workshop, Student student) {

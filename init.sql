@@ -114,10 +114,11 @@ CREATE INDEX idx_workshops_organizer ON workshops(organizer_id);
 CREATE INDEX idx_notifications_status ON notifications(status);
 
 -- 5. Seed Data
-INSERT INTO students (mssv, email, name, status) VALUES 
-('2312345', 'ntcong120@gmail.com', 'Nguyen Van A', 'ACTIVE'),
-('2312346', 'student2@unihub.com', 'Tran Thi B', 'ACTIVE');
-
 INSERT INTO workshops (id, name, description, speaker, speaker_title, room, max_seats, available_slots, start_time, end_time, is_paid, price, status) VALUES 
 ('11111111-1111-1111-1111-111111111111', 'Spring Boot Microservices', 'Học về kiến trúc Microservices với Spring Boot và Docker', 'John Doe', 'Senior Engineer', 'A101', 50, 50, CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '1 day 2 hours', false, 0, 'ACTIVE'),
-('22222222-2222-2222-2222-222222222222', 'Advanced AI in Practice', 'Ứng dụng AI thực tế vào quy trình phát triển phần mềm', 'Jane Smith', 'AI Specialist', 'B202', 30, 30, CURRENT_TIMESTAMP + INTERVAL '2 days', CURRENT_TIMESTAMP + INTERVAL '2 days 3 hours', true, 100000, 'ACTIVE');
+('22222222-2222-2222-2222-222222222222', 'Advanced AI in Practice', 'Ứng dụng AI thực tế vào quy trình phát triển phần mềm', 'Jane Smith', 'AI Specialist', 'B202', 30, 30, CURRENT_TIMESTAMP + INTERVAL '2 days', CURRENT_TIMESTAMP + INTERVAL '2 days 3 hours', true, 100000, 'ACTIVE'),
+('33333333-3333-3333-3333-333333333333', 'Web Frontend Performance', 'Tối ưu hóa hiệu năng website với React và Vite', 'Trần Văn B', 'Frontend Lead', 'C303', 100, 100, CURRENT_TIMESTAMP + INTERVAL '3 days', CURRENT_TIMESTAMP + INTERVAL '3 days 2 hours', false, 0, 'ACTIVE'),
+('44444444-4444-4444-4444-444444444444', 'Data Science với Python', 'Phân tích dữ liệu thực tế với Pandas và Scikit-learn', 'Lê Thị C', 'Data Scientist', 'D404', 40, 40, CURRENT_TIMESTAMP + INTERVAL '4 days', CURRENT_TIMESTAMP + INTERVAL '4 days 3 hours', true, 150000, 'ACTIVE'),
+('55555555-5555-5555-5555-555555555555', 'Kỹ năng Phỏng vấn IT', 'Bí quyết chinh phục các nhà tuyển dụng công nghệ lớn', 'Nguyễn Văn D', 'HR Manager', 'E505', 60, 60, CURRENT_TIMESTAMP + INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '5 days 1 hour', false, 0, 'ACTIVE'),
+('66666666-6666-6666-6666-666666666666', 'Cloud Computing cơ bản', 'Làm quen với AWS, Azure và Google Cloud', 'Phạm Minh E', 'Cloud Architect', 'F606', 45, 45, CURRENT_TIMESTAMP + INTERVAL '6 days', CURRENT_TIMESTAMP + INTERVAL '6 days 2 hours', false, 0, 'ACTIVE'),
+('77777777-7777-7777-7777-777777777777', 'Cyber Security fundamentals', 'Bảo mật ứng dụng và phòng chống tấn công mạng', 'Hoàng Gia F', 'Security Analyst', 'G707', 35, 35, CURRENT_TIMESTAMP + INTERVAL '7 days', CURRENT_TIMESTAMP + INTERVAL '7 days 3 hours', true, 200000, 'ACTIVE');

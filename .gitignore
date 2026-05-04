@@ -52,7 +52,6 @@ ehthumbs.db
 Thumbs.db
 
 # Database / Data (used by docker / local dev)
-data/
 db-data/
 postgres-data/
 mysql-data/

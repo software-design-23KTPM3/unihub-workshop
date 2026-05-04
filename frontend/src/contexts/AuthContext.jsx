@@ -17,7 +17,6 @@ export function AuthProviderWrapper({ children }) {
   const currentUser = useMemo(() => {
     if (!auth.isAuthenticated || !auth.user) return null;
 
-    // Parse JWT token to get roles
     const token = auth.user.access_token;
     let roles = [];
     try {
@@ -27,12 +26,14 @@ export function AuthProviderWrapper({ children }) {
       console.error("Failed to parse token payload", e);
     }
 
+    const profile = auth.user.profile;
     return {
-      ...auth.user.profile,
-      email: auth.user.profile.email,
-      name: auth.user.profile.name || auth.user.profile.preferred_username,
+      ...profile,
+      id: profile.sub,
+      studentId: profile.preferred_username, // MSSV is stored here in Keycloak
+      email: profile.email,
+      name: profile.name || profile.preferred_username,
       roles: roles,
-      // For compatibility with old system if needed
       role: roles.includes('ORGANIZER') ? 'ORGANIZER' : roles.includes('STAFF') ? 'STAFF' : 'STUDENT'
     };
   }, [auth.isAuthenticated, auth.user]);

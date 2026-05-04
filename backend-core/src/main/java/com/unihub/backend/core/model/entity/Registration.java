@@ -11,7 +11,6 @@ import java.util.UUID;
 @Table(name = "registrations")
 public class Registration {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -63,17 +62,21 @@ public class Registration {
     public void setIdempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public ZonedDateTime getCheckedInAt() { return checkedInAt; }
     public void setCheckedInAt(ZonedDateTime checkedInAt) { this.checkedInAt = checkedInAt; }
+    public String getQrCode() { return qrCode; }
+    public void setQrCode(String qrCode) { this.qrCode = qrCode; }
+    public ZonedDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(ZonedDateTime createdAt) { this.createdAt = createdAt; }
 
     public static RegistrationBuilder builder() { return new RegistrationBuilder(); }
     public static class RegistrationBuilder {
+        private UUID id;
         private Student student;
         private Workshop workshop;
         private RegistrationStatus status;
-        private UUID idempotencyKey;
+        public RegistrationBuilder id(UUID id) { this.id = id; return this; }
         public RegistrationBuilder student(Student student) { this.student = student; return this; }
         public RegistrationBuilder workshop(Workshop workshop) { this.workshop = workshop; return this; }
         public RegistrationBuilder status(RegistrationStatus status) { this.status = status; return this; }
-        public RegistrationBuilder idempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; return this; }
-        public Registration build() { return new Registration(null, student, workshop, status, idempotencyKey); }
+        public Registration build() { return new Registration(id, student, workshop, status, id); }
     }
 }

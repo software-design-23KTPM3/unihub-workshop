@@ -1,7 +1,4 @@
 import { API_BASE_URL } from '../config/api.js';
-import { storage } from '../utils/storage.js';
-
-const AUTH_USER_KEY = 'unihub.auth.user';
 
 function buildUrl(endpoint, query) {
   const normalizedBaseUrl = API_BASE_URL.replace(/\/$/, '');
@@ -30,9 +27,7 @@ function getAuthToken() {
     }
   }
   
-  // Fallback for old mechanism
-  const currentUser = storage.get(AUTH_USER_KEY);
-  return currentUser?.token || currentUser?.accessToken || null;
+  return null;
 }
 
 async function parseResponse(response) {

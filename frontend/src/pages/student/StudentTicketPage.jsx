@@ -22,21 +22,28 @@ export default function StudentTicketPage() {
       setLoading(true);
       setError('');
 
-      try {
-        const result = await getRegistrationById(registrationId);
+      let retries = 0;
+      const maxRetries = 5;
 
-        if (!ignore) {
-          setRegistration(result);
+      const attemptLoad = async () => {
+        try {
+          const result = await getRegistrationById(registrationId);
+          if (!ignore) {
+            setRegistration(result);
+            setLoading(false);
+          }
+        } catch (loadError) {
+          if (retries < maxRetries && loadError.status === 404) {
+            retries++;
+            setTimeout(attemptLoad, 1000); // Retry after 1s
+          } else if (!ignore) {
+            setError(loadError.message);
+            setLoading(false);
+          }
         }
-      } catch (loadError) {
-        if (!ignore) {
-          setError(loadError.message);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
+      };
+
+      attemptLoad();
     }
 
     loadTicket();

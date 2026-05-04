@@ -29,15 +29,15 @@ public class AsyncDbServiceImpl implements AsyncDbService {
     @Override
     @Async("taskExecutor")
     @Transactional
-    public void saveRegistrationAsync(Workshop workshop, Student student, UUID idempotencyKey) {
+    public void saveRegistrationAsync(Workshop workshop, Student student, UUID idempotencyKey, RegistrationStatus status) {
         try {
-            log.info("Starting Async DB save for key: {}", idempotencyKey);
+            log.info("Starting Async DB save for key: {}, status: {}", idempotencyKey, status);
 
             Registration registration = Registration.builder()
-                    .idempotencyKey(idempotencyKey)
+                    .id(idempotencyKey)
                     .student(student)
                     .workshop(workshop)
-                    .status(RegistrationStatus.SUCCESS)
+                    .status(status)
                     .build();
 
             registrationRepository.save(registration);

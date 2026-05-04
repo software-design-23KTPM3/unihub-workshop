@@ -24,7 +24,11 @@ const defaultRouteByRole = {
 };
 
 function RootRedirect() {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="loading-overlay">Đang kiểm tra quyền truy cập...</div>;
+  }
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
