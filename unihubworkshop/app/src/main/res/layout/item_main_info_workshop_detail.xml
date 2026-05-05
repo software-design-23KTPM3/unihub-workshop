@@ -112,8 +112,9 @@
             app:tint="@color/purple_primary" />
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="12dp"
             android:orientation="vertical">
             <TextView
@@ -129,6 +130,28 @@
                 android:layout_height="wrap_content"
                 android:text="Tech Hub, Room 402, Building C"
                 android:textColor="@color/text_dark"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AVAILABILITY"
+                android:textColor="#888888"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tvWorkshopSlots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10/50"
+                android:textColor="@color/purple_primary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>

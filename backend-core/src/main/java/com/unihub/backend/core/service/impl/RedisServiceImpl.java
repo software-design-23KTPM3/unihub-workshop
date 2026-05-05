@@ -39,15 +39,24 @@ public class RedisServiceImpl implements RedisService {
     public boolean deductWorkshopSlot(UUID workshopId) {
         String slotKey = WORKSHOP_SLOTS_PREFIX + workshopId;
 
+        // 1. Khởi tạo nếu chưa có trong Redis
         if (Boolean.FALSE.equals(redisTemplate.hasKey(slotKey))) {
             int currentAvailable = workshopRepository.getAvailableSlots(workshopId)
                     .orElseThrow(() -> new RuntimeException("Workshop not found"));
             redisTemplate.opsForValue().set(slotKey, String.valueOf(currentAvailable), 1, TimeUnit.HOURS);
         }
 
+        // 2. Fast-fail check: Kiểm tra nhanh trước khi trừ
+        String val = redisTemplate.opsForValue().get(slotKey);
+        if (val != null && Integer.parseInt(val) <= 0) {
+            return false;
+        }
+
+        // 3. Atomic decrement: Trừ số lượng một cách nguyên tử
         Long remaining = redisTemplate.opsForValue().decrement(slotKey);
         
         if (remaining != null && remaining < 0) {
+            // Nếu vô tình trừ xuống âm (do race condition lúc khởi tạo), rollback lại về 0
             redisTemplate.opsForValue().increment(slotKey);
             return false;
         }

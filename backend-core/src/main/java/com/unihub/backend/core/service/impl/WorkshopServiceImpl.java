@@ -10,6 +10,8 @@ import com.unihub.backend.core.model.entity.Workshop;
 import com.unihub.backend.core.model.enums.SummaryStatus;
 import com.unihub.backend.core.model.enums.WorkshopStatus;
 import com.unihub.backend.core.repository.WorkshopRepository;
+import com.unihub.backend.core.repository.RegistrationRepository;
+import com.unihub.backend.core.model.entity.Registration;
 import com.unihub.backend.core.service.FileStorageService;
 import com.unihub.backend.core.service.WorkshopService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -48,32 +50,56 @@ public class WorkshopServiceImpl implements WorkshopService {
     private final StringRedisTemplate redisTemplate;
     private final RabbitTemplate rabbitTemplate;
     private final FileStorageService fileStorageService;
+    private final RegistrationRepository registrationRepository;
 
     public WorkshopServiceImpl(WorkshopRepository workshopRepository,
             StringRedisTemplate redisTemplate,
             RabbitTemplate rabbitTemplate,
-            FileStorageService fileStorageService) {
+            FileStorageService fileStorageService,
+            RegistrationRepository registrationRepository) {
         this.workshopRepository = workshopRepository;
         this.redisTemplate = redisTemplate;
         this.rabbitTemplate = rabbitTemplate;
         this.fileStorageService = fileStorageService;
+        this.registrationRepository = registrationRepository;
     }
 
     @Override
-    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters) {
+    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters, String studentId) {
         List<Workshop> workshops = isOrganizer(authentication) && !isAdmin(authentication)
                 ? workshopRepository.findByOrganizerId(currentUserId(authentication))
                 : workshopRepository.findAll();
 
+        Map<UUID, String> registrationMap = Collections.emptyMap();
+        if (studentId != null && !studentId.isEmpty()) {
+            List<Registration> registrations = registrationRepository.findByStudentMssv(studentId);
+            registrationMap = registrations.stream()
+                    .collect(Collectors.toMap(
+                            reg -> reg.getWorkshop().getId(),
+                            reg -> reg.getId().toString()
+                    ));
+        }
+
+        final Map<UUID, String> finalRegMap = registrationMap;
         return workshops.stream()
-                .map(this::mapToResponse)
+                .map(w -> mapToResponseWithReg(w, finalRegMap.containsKey(w.getId()), finalRegMap.get(w.getId())))
                 .filter(workshop -> matchesFilters(workshop, filters))
                 .collect(Collectors.toList());
     }
 
     @Override
-    public WorkshopResponse getWorkshopById(UUID id, Authentication authentication) {
-        return mapToResponse(findWorkshop(id));
+    public WorkshopResponse getWorkshopById(UUID id, Authentication authentication, String studentId) {
+        Workshop workshop = findWorkshop(id);
+        boolean isReg = false;
+        String regId = null;
+        if (studentId != null && !studentId.isEmpty()) {
+            var regOpt = registrationRepository.findByStudentMssvAndWorkshopId(studentId, id);
+            if (regOpt.isPresent()) {
+                isReg = true;
+                regId = regOpt.get().getId().toString();
+            }
+        }
+        return mapToResponseWithReg(workshop, isReg, regId);
     }
 
     @Override
@@ -269,10 +295,7 @@ public class WorkshopServiceImpl implements WorkshopService {
     }
 
     private int getRegisteredCount(Workshop workshop) {
-        if (workshop.getMaxSeats() == null || workshop.getAvailableSlots() == null) {
-            return 0;
-        }
-        return Math.max(workshop.getMaxSeats() - workshop.getAvailableSlots(), 0);
+        return (int) registrationRepository.countByWorkshopId(workshop.getId());
     }
 
     private String toContractStatus(Workshop workshop) {
@@ -357,6 +380,10 @@ public class WorkshopServiceImpl implements WorkshopService {
     }
 
     private WorkshopResponse mapToResponse(Workshop workshop) {
+        return mapToResponseWithReg(workshop, false, null);
+    }
+
+    private WorkshopResponse mapToResponseWithReg(Workshop workshop, boolean isRegistered, String registrationId) {
         ZonedDateTime startTime = workshop.getStartTime().withZoneSameInstant(APP_ZONE);
         ZonedDateTime endTime = workshop.getEndTime().withZoneSameInstant(APP_ZONE);
 
@@ -381,6 +408,8 @@ public class WorkshopServiceImpl implements WorkshopService {
                 .tags(deserializeTags(workshop.getTags()))
                 .aiSummary(workshop.getSummaryText())
                 .organizerId(workshop.getOrganizerId())
+                .isRegistered(isRegistered)
+                .registrationId(registrationId)
                 .build();
     }
 }

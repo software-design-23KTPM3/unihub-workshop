@@ -16,8 +16,11 @@ public class WorkShop {
     private List<String> learningPoints;
     private int attendanceCount;
     private int maxAttendance;
+    private String roomMapText;
+    private boolean isRegistered;
+    private String registrationId;
 
-    public WorkShop(String id, String title, String author, Integer price, String date, String time, String address, String description, String roomNumber, boolean isLive, List<String> learningPoints, int attendanceCount, int maxAttendance) {
+    public WorkShop(String id, String title, String author, Integer price, String date, String time, String address, String description, String roomNumber, boolean isLive, List<String> learningPoints, int attendanceCount, int maxAttendance, String roomMapText, boolean isRegistered, String registrationId) {
         this.id = id;
         this.title = title;
         this.author = author;
@@ -31,6 +34,9 @@ public class WorkShop {
         this.learningPoints = learningPoints;
         this.attendanceCount = attendanceCount;
         this.maxAttendance = maxAttendance;
+        this.roomMapText = roomMapText;
+        this.isRegistered = isRegistered;
+        this.registrationId = registrationId;
     }
 
     // Getters and Setters
@@ -46,7 +52,13 @@ public class WorkShop {
     public boolean isLive() { return isLive; }
     public List<String> getLearningPoints() { return learningPoints; }
     public int getAttendanceCount() { return attendanceCount; }
+    public void setAttendanceCount(int attendanceCount) { this.attendanceCount = attendanceCount; }
     public int getMaxAttendance() { return maxAttendance; }
+    public String getRoomMapText() { return roomMapText; }
+    public boolean isRegistered() { return isRegistered; }
+    public void setRegistered(boolean registered) { isRegistered = registered; }
+    public String getRegistrationId() { return registrationId; }
+    public void setRegistrationId(String registrationId) { this.registrationId = registrationId; }
 
     public boolean isFree() {
         return price == null || price == 0;

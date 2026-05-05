@@ -147,6 +147,26 @@ services:
       - postgres
       - keycloak
 
+  notification-worker:
+    build: ./worker
+    container_name: unihub-notification-worker
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_MAIL_HOST=smtp.gmail.com
+      - SPRING_MAIL_PORT=587
+      - SPRING_MAIL_USERNAME=${MAIL_ADDRESS}
+      - SPRING_MAIL_PASSWORD=${MAIL_PASSWORD}
+      - FIREBASE_CONFIG_PATH=/app/serviceAccountKey.json
+      - OPENROUTER_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./worker/serviceAccountKey.json:/app/serviceAccountKey.json
+    depends_on:
+      - postgres
+      - rabbitmq
+
   frontend:
     build: ./frontend
     container_name: unihub-frontend

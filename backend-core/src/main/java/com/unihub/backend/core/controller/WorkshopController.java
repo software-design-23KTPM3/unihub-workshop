@@ -26,23 +26,23 @@ public class WorkshopController {
     }
 
     @GetMapping("/v1/workshops")
-    public List<WorkshopResponse> getAllWorkshopsV1(Authentication authentication, @RequestParam Map<String, String> filters) {
-        return workshopService.getAllWorkshops(authentication, filters);
+    public List<WorkshopResponse> getAllWorkshopsV1(Authentication authentication, @RequestParam Map<String, String> filters, @RequestHeader(value = "Student-ID", required = false) String studentId) {
+        return workshopService.getAllWorkshops(authentication, filters, studentId);
     }
 
     @GetMapping("/workshops")
-    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters) {
-        return workshopService.getAllWorkshops(authentication, filters);
+    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters, @RequestHeader(value = "Student-ID", required = false) String studentId) {
+        return workshopService.getAllWorkshops(authentication, filters, studentId);
     }
 
     @GetMapping("/v1/workshops/{id}")
-    public WorkshopResponse getWorkshopByIdV1(@PathVariable UUID id, Authentication authentication) {
-        return workshopService.getWorkshopById(id, authentication);
+    public WorkshopResponse getWorkshopByIdV1(@PathVariable UUID id, Authentication authentication, @RequestHeader(value = "Student-ID", required = false) String studentId) {
+        return workshopService.getWorkshopById(id, authentication, studentId);
     }
 
     @GetMapping("/workshops/{id}")
-    public WorkshopResponse getWorkshopById(@PathVariable UUID id, Authentication authentication) {
-        return workshopService.getWorkshopById(id, authentication);
+    public WorkshopResponse getWorkshopById(@PathVariable UUID id, Authentication authentication, @RequestHeader(value = "Student-ID", required = false) String studentId) {
+        return workshopService.getWorkshopById(id, authentication, studentId);
     }
 
     @PostMapping(value = "/admin/workshops", consumes = MediaType.APPLICATION_JSON_VALUE)

@@ -21,6 +21,7 @@ public class Student {
     private String name;
     private String birthday;
     private String status;
+    private String fcmToken;
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;

@@ -24,8 +24,8 @@ public class StaffPortalView extends AppCompatActivity {
         setContentView(R.layout.activity_staff_portal);
 
         // Manual DI
-        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl();
-        viewModel = new WorkshopViewModel(new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
+        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl(this);
+        viewModel = new WorkshopViewModel(repo, new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
 
         setupUI();
         setupRecyclerView();

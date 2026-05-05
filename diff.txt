@@ -1,0 +1,792 @@
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/controller/RegistrationController.java b/backend-core/src/main/java/com/unihub/backend/core/controller/RegistrationController.java
+index cddd02e..dcd56f6 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/controller/RegistrationController.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/controller/RegistrationController.java
+@@ -1,5 +1,6 @@
+ package com.unihub.backend.core.controller;
+ 
++import com.unihub.backend.core.model.dto.RegistrationDetailResponse;
+ import com.unihub.backend.core.model.dto.RegistrationRequest;
+ import com.unihub.backend.core.model.dto.RegistrationResponse;
+ import com.unihub.backend.core.service.RegistrationService;
+@@ -26,4 +27,9 @@ public class RegistrationController {
+             @Valid @RequestBody RegistrationRequest request) {
+         return registrationService.createRegistration(idempotencyKey, request);
+     }
++
++    @GetMapping("/{id}")
++    public RegistrationDetailResponse getRegistrationById(@PathVariable UUID id) {
++        return registrationService.getRegistrationById(id);
++    }
+ }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/controller/WorkshopController.java b/backend-core/src/main/java/com/unihub/backend/core/controller/WorkshopController.java
+index 69058c0..e99fa2a 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/controller/WorkshopController.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/controller/WorkshopController.java
+@@ -26,23 +26,23 @@ public class WorkshopController {
+     }
+ 
+     @GetMapping("/v1/workshops")
+-    public List<WorkshopResponse> getAllWorkshopsV1(Authentication authentication, @RequestParam Map<String, String> filters) {
+-        return workshopService.getAllWorkshops(authentication, filters);
++    public List<WorkshopResponse> getAllWorkshopsV1(Authentication authentication, @RequestParam Map<String, String> filters, @RequestHeader(value = "Student-ID", required = false) String studentId) {
++        return workshopService.getAllWorkshops(authentication, filters, studentId);
+     }
+ 
+     @GetMapping("/workshops")
+-    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters) {
+-        return workshopService.getAllWorkshops(authentication, filters);
++    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters, @RequestHeader(value = "Student-ID", required = false) String studentId) {
++        return workshopService.getAllWorkshops(authentication, filters, studentId);
+     }
+ 
+     @GetMapping("/v1/workshops/{id}")
+-    public WorkshopResponse getWorkshopByIdV1(@PathVariable UUID id, Authentication authentication) {
+-        return workshopService.getWorkshopById(id, authentication);
++    public WorkshopResponse getWorkshopByIdV1(@PathVariable UUID id, Authentication authentication, @RequestHeader(value = "Student-ID", required = false) String studentId) {
++        return workshopService.getWorkshopById(id, authentication, studentId);
+     }
+ 
+     @GetMapping("/workshops/{id}")
+-    public WorkshopResponse getWorkshopById(@PathVariable UUID id, Authentication authentication) {
+-        return workshopService.getWorkshopById(id, authentication);
++    public WorkshopResponse getWorkshopById(@PathVariable UUID id, Authentication authentication, @RequestHeader(value = "Student-ID", required = false) String studentId) {
++        return workshopService.getWorkshopById(id, authentication, studentId);
+     }
+ 
+     @PostMapping(value = "/admin/workshops", consumes = MediaType.APPLICATION_JSON_VALUE)
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/model/dto/WorkshopResponse.java b/backend-core/src/main/java/com/unihub/backend/core/model/dto/WorkshopResponse.java
+index 160fc54..525326b 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/model/dto/WorkshopResponse.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/model/dto/WorkshopResponse.java
+@@ -25,6 +25,8 @@ public class WorkshopResponse {
+     private List<String> tags;
+     private String aiSummary;
+     private String organizerId;
++    private Boolean isRegistered;
++    private String registrationId;
+ 
+     public UUID getId() { return id; }
+     public void setId(UUID id) { this.id = id; }
+@@ -66,6 +68,10 @@ public class WorkshopResponse {
+     public void setAiSummary(String aiSummary) { this.aiSummary = aiSummary; }
+     public String getOrganizerId() { return organizerId; }
+     public void setOrganizerId(String organizerId) { this.organizerId = organizerId; }
++    public Boolean getIsRegistered() { return isRegistered; }
++    public void setIsRegistered(Boolean registered) { isRegistered = registered; }
++    public String getRegistrationId() { return registrationId; }
++    public void setRegistrationId(String registrationId) { this.registrationId = registrationId; }
+ 
+     public static WorkshopResponseBuilder builder() { return new WorkshopResponseBuilder(); }
+ 
+@@ -91,6 +97,8 @@ public class WorkshopResponse {
+         public WorkshopResponseBuilder tags(List<String> tags) { r.tags = tags; return this; }
+         public WorkshopResponseBuilder aiSummary(String aiSummary) { r.aiSummary = aiSummary; return this; }
+         public WorkshopResponseBuilder organizerId(String organizerId) { r.organizerId = organizerId; return this; }
++        public WorkshopResponseBuilder isRegistered(Boolean isRegistered) { r.isRegistered = isRegistered; return this; }
++        public WorkshopResponseBuilder registrationId(String registrationId) { r.registrationId = registrationId; return this; }
+         public WorkshopResponse build() { return r; }
+     }
+ }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Registration.java b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Registration.java
+index f418094..c44ce77 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Registration.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Registration.java
+@@ -42,38 +42,117 @@ public class Registration {
+     @Column(name = "checked_in_at")
+     private ZonedDateTime checkedInAt;
+ 
+-    public Registration() {}
+-    public Registration(UUID id, Student student, Workshop workshop, RegistrationStatus status, UUID idempotencyKey) {
++    public Registration() {
++    }
++
++    public Registration(UUID id, Student student, Workshop workshop, RegistrationStatus status, UUID idempotencyKey,
++            String qrCode) {
+         this.id = id;
+         this.student = student;
+         this.workshop = workshop;
+         this.status = status;
+         this.idempotencyKey = idempotencyKey;
++        this.qrCode = qrCode;
++    }
++
++    public UUID getId() {
++        return id;
++    }
++
++    public void setId(UUID id) {
++        this.id = id;
++    }
++
++    public Student getStudent() {
++        return student;
++    }
++
++    public void setStudent(Student student) {
++        this.student = student;
++    }
++
++    public Workshop getWorkshop() {
++        return workshop;
++    }
++
++    public void setWorkshop(Workshop workshop) {
++        this.workshop = workshop;
++    }
++
++    public RegistrationStatus getStatus() {
++        return status;
++    }
++
++    public void setStatus(RegistrationStatus status) {
++        this.status = status;
++    }
++
++    public UUID getIdempotencyKey() {
++        return idempotencyKey;
++    }
++
++    public void setIdempotencyKey(UUID idempotencyKey) {
++        this.idempotencyKey = idempotencyKey;
++    }
++
++    public String getQrCode() {
++        return qrCode;
++    }
++
++    public void setQrCode(String qrCode) {
++        this.qrCode = qrCode;
++    }
++
++    public ZonedDateTime getCheckedInAt() {
++        return checkedInAt;
++    }
++
++    public void setCheckedInAt(ZonedDateTime checkedInAt) {
++        this.checkedInAt = checkedInAt;
++    }
++
++    public String getCreatedAt() {
++        return createdAt.toString();
++    }
++
++    public static RegistrationBuilder builder() {
++        return new RegistrationBuilder();
+     }
+ 
+-    public UUID getId() { return id; }
+-    public void setId(UUID id) { this.id = id; }
+-    public Student getStudent() { return student; }
+-    public void setStudent(Student student) { this.student = student; }
+-    public Workshop getWorkshop() { return workshop; }
+-    public void setWorkshop(Workshop workshop) { this.workshop = workshop; }
+-    public RegistrationStatus getStatus() { return status; }
+-    public void setStatus(RegistrationStatus status) { this.status = status; }
+-    public UUID getIdempotencyKey() { return idempotencyKey; }
+-    public void setIdempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+-    public ZonedDateTime getCheckedInAt() { return checkedInAt; }
+-    public void setCheckedInAt(ZonedDateTime checkedInAt) { this.checkedInAt = checkedInAt; }
+-
+-    public static RegistrationBuilder builder() { return new RegistrationBuilder(); }
+     public static class RegistrationBuilder {
+         private Student student;
+         private Workshop workshop;
+         private RegistrationStatus status;
+         private UUID idempotencyKey;
+-        public RegistrationBuilder student(Student student) { this.student = student; return this; }
+-        public RegistrationBuilder workshop(Workshop workshop) { this.workshop = workshop; return this; }
+-        public RegistrationBuilder status(RegistrationStatus status) { this.status = status; return this; }
+-        public RegistrationBuilder idempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; return this; }
+-        public Registration build() { return new Registration(null, student, workshop, status, idempotencyKey); }
++        private String qrCode;
++
++        public RegistrationBuilder student(Student student) {
++            this.student = student;
++            return this;
++        }
++
++        public RegistrationBuilder workshop(Workshop workshop) {
++            this.workshop = workshop;
++            return this;
++        }
++
++        public RegistrationBuilder status(RegistrationStatus status) {
++            this.status = status;
++            return this;
++        }
++
++        public RegistrationBuilder idempotencyKey(UUID idempotencyKey) {
++            this.idempotencyKey = idempotencyKey;
++            return this;
++        }
++
++        public RegistrationBuilder qrCode(String qrCode) {
++            this.qrCode = qrCode;
++            return this;
++        }
++
++        public Registration build() {
++            return new Registration(null, student, workshop, status, idempotencyKey, qrCode);
++        }
+     }
+ }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Student.java b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Student.java
+index 5f67660..b630da1 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Student.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Student.java
+@@ -21,6 +21,7 @@ public class Student {
+     private String name;
+     private String birthday;
+     private String status;
++    private String fcmToken;
+     @CreationTimestamp
+     @Column(name = "created_at", updatable = false)
+     private ZonedDateTime createdAt;
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Workshop.java b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Workshop.java
+index eda747e..62e9693 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/model/entity/Workshop.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/model/entity/Workshop.java
+@@ -17,6 +17,9 @@ public class Workshop {
+     @GeneratedValue(strategy = GenerationType.UUID)
+     private UUID id;
+ 
++    @Version
++    private Long version;
++
+     @Column(nullable = false)
+     private String name;
+ 
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/repository/RegistrationRepository.java b/backend-core/src/main/java/com/unihub/backend/core/repository/RegistrationRepository.java
+index 0270ce4..d9fd57e 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/repository/RegistrationRepository.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/repository/RegistrationRepository.java
+@@ -7,4 +7,7 @@ import java.util.UUID;
+ 
+ public interface RegistrationRepository extends JpaRepository<Registration, UUID> {
+     Optional<Registration> findByIdempotencyKey(UUID idempotencyKey);
++    java.util.List<Registration> findByStudentMssv(String mssv);
++    Optional<Registration> findByStudentMssvAndWorkshopId(String mssv, UUID workshopId);
++    long countByWorkshopId(UUID workshopId);
+ }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/AsyncDbService.java b/backend-core/src/main/java/com/unihub/backend/core/service/AsyncDbService.java
+deleted file mode 100644
+index 6bed74d..0000000
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/AsyncDbService.java
++++ /dev/null
+@@ -1,9 +0,0 @@
+-package com.unihub.backend.core.service;
+-
+-import com.unihub.backend.core.model.entity.Student;
+-import com.unihub.backend.core.model.entity.Workshop;
+-import java.util.UUID;
+-
+-public interface AsyncDbService {
+-    void saveRegistrationAsync(Workshop workshop, Student student, UUID idempotencyKey);
+-}
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/RegistrationService.java b/backend-core/src/main/java/com/unihub/backend/core/service/RegistrationService.java
+index 7cdda58..745d243 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/RegistrationService.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/service/RegistrationService.java
+@@ -1,5 +1,6 @@
+ package com.unihub.backend.core.service;
+ 
++import com.unihub.backend.core.model.dto.RegistrationDetailResponse;
+ import com.unihub.backend.core.model.dto.RegistrationRequest;
+ import com.unihub.backend.core.model.dto.RegistrationResponse;
+ 
+@@ -7,4 +8,5 @@ import java.util.UUID;
+ 
+ public interface RegistrationService {
+     RegistrationResponse createRegistration(UUID idempotencyKey, RegistrationRequest request);
++    RegistrationDetailResponse getRegistrationById(UUID id);
+ }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/WorkshopService.java b/backend-core/src/main/java/com/unihub/backend/core/service/WorkshopService.java
+index d506770..0f4a3fe 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/WorkshopService.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/service/WorkshopService.java
+@@ -9,9 +9,9 @@ import java.util.Map;
+ import java.util.UUID;
+ 
+ public interface WorkshopService {
+-    List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters);
++    List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters, String studentId);
+ 
+-    WorkshopResponse getWorkshopById(UUID id, Authentication authentication);
++    WorkshopResponse getWorkshopById(UUID id, Authentication authentication, String studentId);
+ 
+     WorkshopResponse createWorkshop(WorkshopRequest request, org.springframework.web.multipart.MultipartFile file,
+             Authentication authentication);
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/impl/AsyncDbServiceImpl.java b/backend-core/src/main/java/com/unihub/backend/core/service/impl/AsyncDbServiceImpl.java
+deleted file mode 100644
+index 9421234..0000000
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/impl/AsyncDbServiceImpl.java
++++ /dev/null
+@@ -1,54 +0,0 @@
+-package com.unihub.backend.core.service.impl;
+-
+-import com.unihub.backend.core.model.entity.Registration;
+-import com.unihub.backend.core.model.entity.Student;
+-import com.unihub.backend.core.model.entity.Workshop;
+-import com.unihub.backend.core.model.enums.RegistrationStatus;
+-import com.unihub.backend.core.repository.RegistrationRepository;
+-import com.unihub.backend.core.repository.WorkshopRepository;
+-import com.unihub.backend.core.service.AsyncDbService;
+-import org.springframework.scheduling.annotation.Async;
+-import org.springframework.stereotype.Service;
+-import org.springframework.transaction.annotation.Transactional;
+-
+-import java.util.UUID;
+-
+-@Service
+-public class AsyncDbServiceImpl implements AsyncDbService {
+-
+-    private final RegistrationRepository registrationRepository;
+-    private final WorkshopRepository workshopRepository;
+-
+-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AsyncDbServiceImpl.class);
+-
+-    public AsyncDbServiceImpl(RegistrationRepository registrationRepository, WorkshopRepository workshopRepository) {
+-        this.registrationRepository = registrationRepository;
+-        this.workshopRepository = workshopRepository;
+-    }
+-
+-    @Override
+-    @Async("taskExecutor")
+-    @Transactional
+-    public void saveRegistrationAsync(Workshop workshop, Student student, UUID idempotencyKey) {
+-        try {
+-            log.info("Starting Async DB save for key: {}", idempotencyKey);
+-
+-            Registration registration = Registration.builder()
+-                    .idempotencyKey(idempotencyKey)
+-                    .student(student)
+-                    .workshop(workshop)
+-                    .status(RegistrationStatus.SUCCESS)
+-                    .build();
+-
+-            registrationRepository.save(registration);
+-
+-            workshop.setAvailableSlots(workshop.getAvailableSlots() - 1);
+-            workshopRepository.save(workshop);
+-
+-            log.info("Async DB save COMPLETED for key: {}", idempotencyKey);
+-
+-        } catch (Exception e) {
+-            log.error("ASYNC DB ERROR for key {}: {}", idempotencyKey, e.getMessage());
+-        }
+-    }
+-}
+\ No newline at end of file
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/impl/RedisServiceImpl.java b/backend-core/src/main/java/com/unihub/backend/core/service/impl/RedisServiceImpl.java
+index ed2455f..beb87e5 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/impl/RedisServiceImpl.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/service/impl/RedisServiceImpl.java
+@@ -39,15 +39,24 @@ public class RedisServiceImpl implements RedisService {
+     public boolean deductWorkshopSlot(UUID workshopId) {
+         String slotKey = WORKSHOP_SLOTS_PREFIX + workshopId;
+ 
++        // 1. Khởi tạo nếu chưa có trong Redis
+         if (Boolean.FALSE.equals(redisTemplate.hasKey(slotKey))) {
+             int currentAvailable = workshopRepository.getAvailableSlots(workshopId)
+                     .orElseThrow(() -> new RuntimeException("Workshop not found"));
+             redisTemplate.opsForValue().set(slotKey, String.valueOf(currentAvailable), 1, TimeUnit.HOURS);
+         }
+ 
++        // 2. Fast-fail check: Kiểm tra nhanh trước khi trừ
++        String val = redisTemplate.opsForValue().get(slotKey);
++        if (val != null && Integer.parseInt(val) <= 0) {
++            return false;
++        }
++
++        // 3. Atomic decrement: Trừ số lượng một cách nguyên tử
+         Long remaining = redisTemplate.opsForValue().decrement(slotKey);
+         
+         if (remaining != null && remaining < 0) {
++            // Nếu vô tình trừ xuống âm (do race condition lúc khởi tạo), rollback lại về 0
+             redisTemplate.opsForValue().increment(slotKey);
+             return false;
+         }
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/impl/RegistrationServiceImpl.java b/backend-core/src/main/java/com/unihub/backend/core/service/impl/RegistrationServiceImpl.java
+index ade0e2d..f17cb82 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/impl/RegistrationServiceImpl.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/service/impl/RegistrationServiceImpl.java
+@@ -6,14 +6,17 @@ import com.unihub.backend.core.model.entity.*;
+ import com.unihub.backend.core.model.enums.RegistrationStatus;
+ import com.unihub.backend.core.repository.*;
+ import com.unihub.backend.core.service.RegistrationService;
+-import com.unihub.backend.core.service.RedisService; // Service mới
+-import lombok.RequiredArgsConstructor;
++import com.unihub.backend.core.service.RedisService;
+ import org.springframework.amqp.rabbit.core.RabbitTemplate;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+-import com.unihub.backend.core.service.AsyncDbService;
++import org.springframework.transaction.support.TransactionSynchronization;
++import org.springframework.transaction.support.TransactionSynchronizationManager;
+ 
++import java.time.format.DateTimeFormatter;
++import java.util.List;
+ import java.util.UUID;
++import java.util.stream.Collectors;
+ 
+ @Service
+ public class RegistrationServiceImpl implements RegistrationService {
+@@ -24,33 +27,74 @@ public class RegistrationServiceImpl implements RegistrationService {
+         private final RabbitTemplate rabbitTemplate;
+         private final WorkshopRepository workshopRepository;
+         private final StudentRepository studentRepository;
+-        private final AsyncDbService asyncDbService;
++        private final RegistrationRepository registrationRepository;
+ 
+         public RegistrationServiceImpl(
+                         RedisService redisService,
+                         RabbitTemplate rabbitTemplate,
+                         WorkshopRepository workshopRepository,
+                         StudentRepository studentRepository,
+-                        AsyncDbService asyncDbService) {
++                        RegistrationRepository registrationRepository) {
+                 this.redisService = redisService;
+                 this.rabbitTemplate = rabbitTemplate;
+                 this.workshopRepository = workshopRepository;
+                 this.studentRepository = studentRepository;
+-                this.asyncDbService = asyncDbService;
++                this.registrationRepository = registrationRepository;
++        }
++
++        @Override
++        public RegistrationDetailResponse getRegistrationById(UUID id) {
++                Registration reg = registrationRepository.findById(id)
++                                .orElseThrow(() -> new RuntimeException("Registration not found"));
++                return mapToDetailResponse(reg);
++        }
++
++        private RegistrationDetailResponse mapToDetailResponse(Registration reg) {
++                Workshop w = reg.getWorkshop();
++                WorkshopResponse wResp = WorkshopResponse.builder()
++                                .id(w.getId())
++                                .title(w.getName())
++                                .description(w.getDescription())
++                                .speakerName(w.getSpeaker())
++                                .room(w.getRoom())
++                                .date(w.getStartTime().toLocalDate().toString())
++                                .startTime(w.getStartTime().toLocalTime().toString())
++                                .endTime(w.getEndTime().toLocalTime().toString())
++                                .build();
++
++                return RegistrationDetailResponse.builder()
++                                .id(reg.getId())
++                                .workshop(wResp)
++                                .studentId(reg.getStudent().getMssv())
++                                .studentName(reg.getStudent().getName())
++                                .status(reg.getStatus())
++                                .qrCode(reg.getQrCode())
++                                .registeredAt(reg.getCreatedAt() != null ? reg.getCreatedAt().toString() : null)
++                                .build();
+         }
+ 
+         @Override
+         @Transactional
+         public RegistrationResponse createRegistration(UUID idempotencyKey, RegistrationRequest request) {
+ 
++                // 1. Check Redis Idempotency (Fast Path)
+                 if (!redisService.isUniqueRequest(idempotencyKey)) {
+-                        return RegistrationResponse.builder()
+-                                        .status(RegistrationStatus.PENDING)
+-                                        .message("Request is already being processed or completed.")
+-                                        .build();
++                        // If Redis says not unique, we should check DB if it's actually finished
++                        return registrationRepository.findByIdempotencyKey(idempotencyKey)
++                                        .map(reg -> RegistrationResponse.builder()
++                                                        .registrationId(reg.getId())
++                                                        .status(RegistrationStatus.SUCCESS)
++                                                        .message("Registration already exists.")
++                                                        .build())
++                                        .orElse(RegistrationResponse.builder()
++                                                        .status(RegistrationStatus.PENDING)
++                                                        .message("Request is already being processed.")
++                                                        .build());
+                 }
+ 
++                boolean slotDeducted = false;
+                 try {
++                        // 2. Redis Slot Check & Deduct (Throttle)
+                         if (!redisService.deductWorkshopSlot(request.getWorkshopId())) {
+                                 redisService.removeIdempotencyKey(idempotencyKey);
+                                 return RegistrationResponse.builder()
+@@ -58,52 +102,127 @@ public class RegistrationServiceImpl implements RegistrationService {
+                                                 .message("Workshop is sold out")
+                                                 .build();
+                         }
++                        slotDeducted = true;
+ 
++                        // 3. Database Work (Source of Truth with Optimistic Locking)
+                         Workshop workshop = workshopRepository.findById(request.getWorkshopId())
+                                         .orElseThrow(() -> new RuntimeException("Workshop not found"));
++
++                        if (workshop.getAvailableSlots() <= 0) {
++                                throw new RuntimeException("Workshop is sold out");
++                        }
++
++                        // Decrement available slots - @Version handles race conditions
++                        workshop.setAvailableSlots(workshop.getAvailableSlots() - 1);
++                        workshopRepository.save(workshop);
++
+                         Student student = studentRepository.findById(request.getStudentId())
+                                         .orElseThrow(() -> new RuntimeException("Student not found"));
+ 
+-                        asyncDbService.saveRegistrationAsync(workshop, student, idempotencyKey);
++                        String qrData = "{\"studentId\":\"" + student.getMssv() + "\",\"workshopId\":\""
++                                        + workshop.getId() + "\"}";
+ 
+-                        log.info("Registration successful for student {} and workshop {}",
+-                                        request.getStudentId(), request.getWorkshopId());
++                        Registration registration = Registration.builder()
++                                        .student(student)
++                                        .workshop(workshop)
++                                        .status(RegistrationStatus.SUCCESS)
++                                        .idempotencyKey(idempotencyKey)
++                                        .qrCode(qrData)
++                                        .build();
+ 
+-                        sendNotification(workshop, student);
++                        // 4. Register Transaction Synchronization for both Success and Failure
++                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
++                                @Override
++                                public void afterCompletion(int status) {
++                                        if (status == STATUS_COMMITTED) {
++                                                // Success: Send notification
++                                                log.info("Transaction committed successfully. Sending notifications.");
++                                                sendNotification(workshop, student, qrData);
++                                        } else if (status == STATUS_ROLLED_BACK) {
++                                                // Failure: Rollback Redis
++                                                log.warn("Transaction rolled back. Rolling back Redis slots and idempotency key.");
++                                                redisService.rollbackSlot(request.getWorkshopId());
++                                                redisService.removeIdempotencyKey(idempotencyKey);
++                                        }
++                                }
++                        });
++
++                        log.info("Registration request processed. Waiting for transaction commit for student {} and workshop {}",
++                                        request.getStudentId(), request.getWorkshopId());
+ 
+                         return RegistrationResponse.builder()
+                                         .registrationId(idempotencyKey)
+-                                        .status(RegistrationStatus.PENDING)
+-                                        .message("Registration successful. Notification sent.")
++                                        .status(RegistrationStatus.SUCCESS)
++                                        .message("Registration request received and is being processed.")
+                                         .build();
+ 
+-                } catch (Exception e) {
+-                        log.error("Error during registration process: {}", e.getMessage());
+-
+-                        redisService.rollbackSlot(request.getWorkshopId());
+-                        redisService.removeIdempotencyKey(idempotencyKey);
++                } catch (org.springframework.dao.DataIntegrityViolationException e) {
++                        // DB Level Idempotency Check
++                        return registrationRepository.findByIdempotencyKey(idempotencyKey)
++                                        .map(reg -> RegistrationResponse.builder()
++                                                        .registrationId(reg.getId())
++                                                        .status(RegistrationStatus.SUCCESS)
++                                                        .message("Registration already exists.")
++                                                        .build())
++                                        .orElseThrow(() -> new RuntimeException("Data integrity violation", e));
+ 
+-                        throw new RuntimeException("Failed to process registration", e);
++                } catch (Exception e) {
++                        log.error("Error during registration processing: {}", e.getMessage());
++                        // Rethrow to trigger transactional rollback (which triggers afterCompletion)
++                        throw e;
+                 }
+         }
+ 
+-        private void sendNotification(Workshop workshop, Student student) {
+-                NotificationData data = NotificationData.builder()
+-                                .title("REGISTER WORKSHOP " + workshop.getName() + " SUCCESS")
+-                                .msg("Congratulations " + student.getName() + "! You have successfully registered.")
+-                                .to(student.getEmail())
+-                                .build();
++        private void sendNotification(Workshop workshop, Student student, String qrData) {
++                try {
++                        String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="
++                                        + java.net.URLEncoder.encode(qrData, "UTF-8");
++
++                        String htmlMsg = "<h2>Congratulations " + student.getName() + "!</h2>"
++                                        + "<p>You have successfully registered for the workshop: <b>"
++                                        + workshop.getName() + "</b></p>"
++                                        + "<p><b>Time:</b> " + workshop.getStartTime() + "</p>"
++                                        + "<p><b>Room:</b> " + workshop.getRoom() + "</p>"
++                                        + "<p>Please use the QR code below to check-in:</p>"
++                                        + "<img src='" + qrUrl + "' alt='QR Code' />";
++
++                        NotificationData data = NotificationData.builder()
++                                        .title("Registration Successful: " + workshop.getName())
++                                        .msg(htmlMsg)
++                                        .to(student.getEmail())
++                                        .build();
+ 
+-                NotificationRequest notificationRequest = NotificationRequest.builder()
+-                                .type("EMAIL")
+-                                .data(data)
+-                                .build();
++                        NotificationRequest emailRequest = NotificationRequest.builder()
++                                        .type("EMAIL")
++                                        .data(data)
++                                        .build();
++
++                        rabbitTemplate.convertAndSend(
++                                        com.unihub.backend.core.config.RabbitConfig.NOTIFICATION_EXCHANGE,
++                                        com.unihub.backend.core.config.RabbitConfig.NOTIFICATION_ROUTING_KEY,
++                                        emailRequest);
++
++                        // APP Notification
++                        NotificationData appData = NotificationData.builder()
++                                        .title("Registration Successful: " + workshop.getName())
++                                        .msg("You have successfully registered for " + workshop.getName()
++                                                        + ". See you there!")
++                                        .to(student.getFcmToken() != null ? student.getFcmToken() : student.getEmail())
++                                        .build();
+ 
+-                rabbitTemplate.convertAndSend(
+-                                RabbitConfig.NOTIFICATION_EXCHANGE,
+-                                RabbitConfig.NOTIFICATION_ROUTING_KEY,
+-                                notificationRequest);
++                        NotificationRequest appRequest = NotificationRequest.builder()
++                                        .type("APP")
++                                        .data(appData)
++                                        .build();
+ 
+-                log.info("Message sent to RabbitMQ for workshop: {}", workshop.getName());
++                        rabbitTemplate.convertAndSend(
++                                        com.unihub.backend.core.config.RabbitConfig.NOTIFICATION_EXCHANGE,
++                                        com.unihub.backend.core.config.RabbitConfig.NOTIFICATION_ROUTING_KEY,
++                                        appRequest);
++
++                        log.info("Messages (EMAIL & APP) sent to RabbitMQ successfully after commit.");
++                } catch (Exception e) {
++                        log.error("Failed to construct or send notification", e);
++                }
+         }
+ }
+\ No newline at end of file
+diff --git a/backend-core/src/main/java/com/unihub/backend/core/service/impl/WorkshopServiceImpl.java b/backend-core/src/main/java/com/unihub/backend/core/service/impl/WorkshopServiceImpl.java
+index fd3ad98..3950432 100644
+--- a/backend-core/src/main/java/com/unihub/backend/core/service/impl/WorkshopServiceImpl.java
++++ b/backend-core/src/main/java/com/unihub/backend/core/service/impl/WorkshopServiceImpl.java
+@@ -10,6 +10,8 @@ import com.unihub.backend.core.model.entity.Workshop;
+ import com.unihub.backend.core.model.enums.SummaryStatus;
+ import com.unihub.backend.core.model.enums.WorkshopStatus;
+ import com.unihub.backend.core.repository.WorkshopRepository;
++import com.unihub.backend.core.repository.RegistrationRepository;
++import com.unihub.backend.core.model.entity.Registration;
+ import com.unihub.backend.core.service.FileStorageService;
+ import com.unihub.backend.core.service.WorkshopService;
+ import org.springframework.amqp.rabbit.core.RabbitTemplate;
+@@ -48,32 +50,56 @@ public class WorkshopServiceImpl implements WorkshopService {
+     private final StringRedisTemplate redisTemplate;
+     private final RabbitTemplate rabbitTemplate;
+     private final FileStorageService fileStorageService;
++    private final RegistrationRepository registrationRepository;
+ 
+     public WorkshopServiceImpl(WorkshopRepository workshopRepository,
+             StringRedisTemplate redisTemplate,
+             RabbitTemplate rabbitTemplate,
+-            FileStorageService fileStorageService) {
++            FileStorageService fileStorageService,
++            RegistrationRepository registrationRepository) {
+         this.workshopRepository = workshopRepository;
+         this.redisTemplate = redisTemplate;
+         this.rabbitTemplate = rabbitTemplate;
+         this.fileStorageService = fileStorageService;
++        this.registrationRepository = registrationRepository;
+     }
+ 
+     @Override
+-    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters) {
++    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters, String studentId) {
+         List<Workshop> workshops = isOrganizer(authentication) && !isAdmin(authentication)
+                 ? workshopRepository.findByOrganizerId(currentUserId(authentication))
+                 : workshopRepository.findAll();
+ 
++        Map<UUID, String> registrationMap = Collections.emptyMap();
++        if (studentId != null && !studentId.isEmpty()) {
++            List<Registration> registrations = registrationRepository.findByStudentMssv(studentId);
++            registrationMap = registrations.stream()
++                    .collect(Collectors.toMap(
++                            reg -> reg.getWorkshop().getId(),
++                            reg -> reg.getId().toString()
++                    ));
++        }
++
++        final Map<UUID, String> finalRegMap = registrationMap;
+         return workshops.stream()
+-                .map(this::mapToResponse)
++                .map(w -> mapToResponseWithReg(w, finalRegMap.containsKey(w.getId()), finalRegMap.get(w.getId())))
+                 .filter(workshop -> matchesFilters(workshop, filters))
+                 .collect(Collectors.toList());
+     }
+ 
+     @Override
+-    public WorkshopResponse getWorkshopById(UUID id, Authentication authentication) {
+-        return mapToResponse(findWorkshop(id));
++    public WorkshopResponse getWorkshopById(UUID id, Authentication authentication, String studentId) {
++        Workshop workshop = findWorkshop(id);
++        boolean isReg = false;
++        String regId = null;
++        if (studentId != null && !studentId.isEmpty()) {
++            var regOpt = registrationRepository.findByStudentMssvAndWorkshopId(studentId, id);
++            if (regOpt.isPresent()) {
++                isReg = true;
++                regId = regOpt.get().getId().toString();
++            }
++        }
++        return mapToResponseWithReg(workshop, isReg, regId);
+     }
+ 
+     @Override
+@@ -269,10 +295,7 @@ public class WorkshopServiceImpl implements WorkshopService {
+     }
+ 
+     private int getRegisteredCount(Workshop workshop) {
+-        if (workshop.getMaxSeats() == null || workshop.getAvailableSlots() == null) {
+-            return 0;
+-        }
+-        return Math.max(workshop.getMaxSeats() - workshop.getAvailableSlots(), 0);
++        return (int) registrationRepository.countByWorkshopId(workshop.getId());
+     }
+ 
+     private String toContractStatus(Workshop workshop) {
+@@ -357,6 +380,10 @@ public class WorkshopServiceImpl implements WorkshopService {
+     }
+ 
+     private WorkshopResponse mapToResponse(Workshop workshop) {
++        return mapToResponseWithReg(workshop, false, null);
++    }
++
++    private WorkshopResponse mapToResponseWithReg(Workshop workshop, boolean isRegistered, String registrationId) {
+         ZonedDateTime startTime = workshop.getStartTime().withZoneSameInstant(APP_ZONE);
+         ZonedDateTime endTime = workshop.getEndTime().withZoneSameInstant(APP_ZONE);
+ 
+@@ -381,6 +408,8 @@ public class WorkshopServiceImpl implements WorkshopService {
+                 .tags(deserializeTags(workshop.getTags()))
+                 .aiSummary(workshop.getSummaryText())
+                 .organizerId(workshop.getOrganizerId())
++                .isRegistered(isRegistered)
++                .registrationId(registrationId)
+                 .build();
+     }
+ }
+diff --git a/backend-core/src/main/resources/application.yml b/backend-core/src/main/resources/application.yml
+index 238048f..0126196 100644
+--- a/backend-core/src/main/resources/application.yml
++++ b/backend-core/src/main/resources/application.yml
+@@ -13,7 +13,7 @@ spring:
+     password: password
+   jpa:
+     hibernate:
+-      ddl-auto: validate
++      ddl-auto: update
+     show-sql: true
+     properties:
+       hibernate:

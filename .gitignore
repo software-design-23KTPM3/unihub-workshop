@@ -61,3 +61,6 @@ redis-data/
 backend-core/target/
 
 uploads/
+
+worker/serviceAccountKey.json
+unihubworkshop/app/google-services.json

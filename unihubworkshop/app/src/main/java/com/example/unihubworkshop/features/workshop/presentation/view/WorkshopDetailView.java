@@ -21,8 +21,8 @@ public class WorkshopDetailView extends AppCompatActivity {
         setContentView(R.layout.activity_workshop_detail);
 
         // Manual DI
-        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl();
-        viewModel = new WorkshopViewModel(new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
+        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl(this);
+        viewModel = new WorkshopViewModel(repo, new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
 
         String workshopId = getIntent().getStringExtra("workshop_id");
         if (workshopId != null) {

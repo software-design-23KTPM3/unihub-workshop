@@ -25,6 +25,8 @@ public class WorkshopResponse {
     private List<String> tags;
     private String aiSummary;
     private String organizerId;
+    private Boolean isRegistered;
+    private String registrationId;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -66,6 +68,10 @@ public class WorkshopResponse {
     public void setAiSummary(String aiSummary) { this.aiSummary = aiSummary; }
     public String getOrganizerId() { return organizerId; }
     public void setOrganizerId(String organizerId) { this.organizerId = organizerId; }
+    public Boolean getIsRegistered() { return isRegistered; }
+    public void setIsRegistered(Boolean registered) { isRegistered = registered; }
+    public String getRegistrationId() { return registrationId; }
+    public void setRegistrationId(String registrationId) { this.registrationId = registrationId; }
 
     public static WorkshopResponseBuilder builder() { return new WorkshopResponseBuilder(); }
 
@@ -91,6 +97,8 @@ public class WorkshopResponse {
         public WorkshopResponseBuilder tags(List<String> tags) { r.tags = tags; return this; }
         public WorkshopResponseBuilder aiSummary(String aiSummary) { r.aiSummary = aiSummary; return this; }
         public WorkshopResponseBuilder organizerId(String organizerId) { r.organizerId = organizerId; return this; }
+        public WorkshopResponseBuilder isRegistered(Boolean isRegistered) { r.isRegistered = isRegistered; return this; }
+        public WorkshopResponseBuilder registrationId(String registrationId) { r.registrationId = registrationId; return this; }
         public WorkshopResponse build() { return r; }
     }
 }

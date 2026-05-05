@@ -7,4 +7,7 @@ import java.util.UUID;
 
 public interface RegistrationRepository extends JpaRepository<Registration, UUID> {
     Optional<Registration> findByIdempotencyKey(UUID idempotencyKey);
+    java.util.List<Registration> findByStudentMssv(String mssv);
+    Optional<Registration> findByStudentMssvAndWorkshopId(String mssv, UUID workshopId);
+    long countByWorkshopId(UUID workshopId);
 }

@@ -43,6 +43,16 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(message, "VALIDATION_ERROR", HttpStatus.UNPROCESSABLE_ENTITY, request);
     }
 
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockingFailure(org.springframework.orm.ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+        return buildErrorResponse("Hệ thống đang quá tải, vui lòng thử lại.", "CONCURRENT_MODIFICATION", HttpStatus.CONFLICT, request);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
+        return buildErrorResponse("Dữ liệu không hợp lệ hoặc đã tồn tại.", "DATA_INTEGRITY_VIOLATION", HttpStatus.CONFLICT, request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         return buildErrorResponse(ex.getMessage(), "INTERNAL_SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, request);

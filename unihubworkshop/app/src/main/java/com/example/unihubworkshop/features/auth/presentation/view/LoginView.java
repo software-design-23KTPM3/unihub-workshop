@@ -12,8 +12,17 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
+
+import com.example.unihubworkshop.core.network.RetrofitClient;
+import com.example.unihubworkshop.features.auth.data.datasource.AuthApi;
+import com.example.unihubworkshop.features.auth.data.datasource.TokenResponse;
 import com.example.unihubworkshop.features.workshop.presentation.view.StaffPortalView;
 import com.example.unihubworkshop.features.workshop.presentation.view.WorkshopView;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class LoginView extends AppCompatActivity {
     private View inputUsername;
@@ -34,8 +43,6 @@ public class LoginView extends AppCompatActivity {
         tvInputUserName.setText("Username");
         tvInputPassword.setText("Password");
 
-        //TEST NOT BACKEND
-
         EditText etUsername = inputUsername.findViewById(R.id.etInput);
         EditText etPassword = inputPassword.findViewById(R.id.etInput);
         etUsername.setHint("Enter username");
@@ -43,24 +50,43 @@ public class LoginView extends AppCompatActivity {
 
         btnLogin.setOnClickListener(v -> {
             String username = etUsername.getText().toString().trim();
+            String password = etPassword.getText().toString().trim();
             
-            SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            editor.putBoolean("isLogged", true);
-            
-            Intent intent;
-            if ("staff".equalsIgnoreCase(username)) {
-                editor.putString("userRole", "STAFF");
-                intent = new Intent(this, StaffPortalView.class);
-            } else {
-                editor.putString("userRole", "STUDENT");
-                intent = new Intent(this, WorkshopView.class);
-            }
-            editor.apply();
-            
-            startActivity(intent);
-            finish();
+            AuthApi authApi = RetrofitClient.getKeycloakClient().create(AuthApi.class);
+            authApi.login("unihub-client", username, password, "password").enqueue(new Callback<TokenResponse>() {
+                @Override
+                public void onResponse(Call<TokenResponse> call, Response<TokenResponse> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        String token = response.body().getAccessToken();
+                        SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
+                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        editor.putBoolean("isLogged", true);
+                        editor.putString("accessToken", token);
+                        editor.putString("userId", username);
+                        
+                        // Just a simple hack for roles based on username
+                        Intent intent;
+                        if (username.startsWith("organizer")) {
+                            editor.putString("userRole", "STAFF");
+                            intent = new Intent(LoginView.this, StaffPortalView.class);
+                        } else {
+                            editor.putString("userRole", "STUDENT");
+                            intent = new Intent(LoginView.this, WorkshopView.class);
+                        }
+                        editor.apply();
+                        
+                        startActivity(intent);
+                        finish();
+                    } else {
+                        Toast.makeText(LoginView.this, "Login Failed", Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<TokenResponse> call, Throwable t) {
+                    Toast.makeText(LoginView.this, "Network Error", Toast.LENGTH_SHORT).show();
+                }
+            });
         });
     }
-
 }

@@ -1,5 +1,6 @@
 package com.unihub.backend.core.controller;
 
+import com.unihub.backend.core.model.dto.RegistrationDetailResponse;
 import com.unihub.backend.core.model.dto.RegistrationRequest;
 import com.unihub.backend.core.model.dto.RegistrationResponse;
 import com.unihub.backend.core.service.RegistrationService;
@@ -25,5 +26,10 @@ public class RegistrationController {
             @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @Valid @RequestBody RegistrationRequest request) {
         return registrationService.createRegistration(idempotencyKey, request);
+    }
+
+    @GetMapping("/{id}")
+    public RegistrationDetailResponse getRegistrationById(@PathVariable UUID id) {
+        return registrationService.getRegistrationById(id);
     }
 }

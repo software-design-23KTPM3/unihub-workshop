@@ -9,9 +9,9 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface WorkshopService {
-    List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters);
+    List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters, String studentId);
 
-    WorkshopResponse getWorkshopById(UUID id, Authentication authentication);
+    WorkshopResponse getWorkshopById(UUID id, Authentication authentication, String studentId);
 
     WorkshopResponse createWorkshop(WorkshopRequest request, org.springframework.web.multipart.MultipartFile file,
             Authentication authentication);

@@ -13,4 +13,5 @@
     <color name="seat_empty">#DDD9FF</color>
     <color name="seat_full">#00C853</color>
     <color name="staff_tag">#4DFFFFFF</color>
+    <color name="white">#FFFFFF</color>
 </resources>

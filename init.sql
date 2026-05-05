@@ -113,10 +113,7 @@ CREATE INDEX idx_workshops_status ON workshops(status);
 CREATE INDEX idx_workshops_organizer ON workshops(organizer_id);
 CREATE INDEX idx_notifications_status ON notifications(status);
 
--- 5. Seed Data
-INSERT INTO students (mssv, email, name, status) VALUES 
-('2312345', 'ntcong120@gmail.com', 'Nguyen Van A', 'ACTIVE'),
-('2312346', 'student2@unihub.com', 'Tran Thi B', 'ACTIVE');
+-- 5. Seed Data (Students will be synced via sync-service)
 
 INSERT INTO workshops (id, name, description, speaker, speaker_title, room, max_seats, available_slots, start_time, end_time, is_paid, price, status) VALUES 
 ('11111111-1111-1111-1111-111111111111', 'Spring Boot Microservices', 'Học về kiến trúc Microservices với Spring Boot và Docker', 'John Doe', 'Senior Engineer', 'A101', 50, 50, CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '1 day 2 hours', false, 0, 'ACTIVE'),

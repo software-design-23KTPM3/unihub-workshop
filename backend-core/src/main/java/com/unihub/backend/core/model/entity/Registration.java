@@ -42,38 +42,117 @@ public class Registration {
     @Column(name = "checked_in_at")
     private ZonedDateTime checkedInAt;
 
-    public Registration() {}
-    public Registration(UUID id, Student student, Workshop workshop, RegistrationStatus status, UUID idempotencyKey) {
+    public Registration() {
+    }
+
+    public Registration(UUID id, Student student, Workshop workshop, RegistrationStatus status, UUID idempotencyKey,
+            String qrCode) {
         this.id = id;
         this.student = student;
         this.workshop = workshop;
         this.status = status;
         this.idempotencyKey = idempotencyKey;
+        this.qrCode = qrCode;
     }
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public Student getStudent() { return student; }
-    public void setStudent(Student student) { this.student = student; }
-    public Workshop getWorkshop() { return workshop; }
-    public void setWorkshop(Workshop workshop) { this.workshop = workshop; }
-    public RegistrationStatus getStatus() { return status; }
-    public void setStatus(RegistrationStatus status) { this.status = status; }
-    public UUID getIdempotencyKey() { return idempotencyKey; }
-    public void setIdempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; }
-    public ZonedDateTime getCheckedInAt() { return checkedInAt; }
-    public void setCheckedInAt(ZonedDateTime checkedInAt) { this.checkedInAt = checkedInAt; }
+    public UUID getId() {
+        return id;
+    }
 
-    public static RegistrationBuilder builder() { return new RegistrationBuilder(); }
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public Student getStudent() {
+        return student;
+    }
+
+    public void setStudent(Student student) {
+        this.student = student;
+    }
+
+    public Workshop getWorkshop() {
+        return workshop;
+    }
+
+    public void setWorkshop(Workshop workshop) {
+        this.workshop = workshop;
+    }
+
+    public RegistrationStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(RegistrationStatus status) {
+        this.status = status;
+    }
+
+    public UUID getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(UUID idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
+
+    public String getQrCode() {
+        return qrCode;
+    }
+
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
+    }
+
+    public ZonedDateTime getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public void setCheckedInAt(ZonedDateTime checkedInAt) {
+        this.checkedInAt = checkedInAt;
+    }
+
+    public String getCreatedAt() {
+        return createdAt.toString();
+    }
+
+    public static RegistrationBuilder builder() {
+        return new RegistrationBuilder();
+    }
+
     public static class RegistrationBuilder {
         private Student student;
         private Workshop workshop;
         private RegistrationStatus status;
         private UUID idempotencyKey;
-        public RegistrationBuilder student(Student student) { this.student = student; return this; }
-        public RegistrationBuilder workshop(Workshop workshop) { this.workshop = workshop; return this; }
-        public RegistrationBuilder status(RegistrationStatus status) { this.status = status; return this; }
-        public RegistrationBuilder idempotencyKey(UUID idempotencyKey) { this.idempotencyKey = idempotencyKey; return this; }
-        public Registration build() { return new Registration(null, student, workshop, status, idempotencyKey); }
+        private String qrCode;
+
+        public RegistrationBuilder student(Student student) {
+            this.student = student;
+            return this;
+        }
+
+        public RegistrationBuilder workshop(Workshop workshop) {
+            this.workshop = workshop;
+            return this;
+        }
+
+        public RegistrationBuilder status(RegistrationStatus status) {
+            this.status = status;
+            return this;
+        }
+
+        public RegistrationBuilder idempotencyKey(UUID idempotencyKey) {
+            this.idempotencyKey = idempotencyKey;
+            return this;
+        }
+
+        public RegistrationBuilder qrCode(String qrCode) {
+            this.qrCode = qrCode;
+            return this;
+        }
+
+        public Registration build() {
+            return new Registration(null, student, workshop, status, idempotencyKey, qrCode);
+        }
     }
 }

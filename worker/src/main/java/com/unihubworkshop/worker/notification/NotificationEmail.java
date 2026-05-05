@@ -22,11 +22,16 @@ public class NotificationEmail implements NotificationChannel {
     @Override
     public void send(NotificationData data) {
         System.out.println("EMAIL CALL");
-        SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setFrom(mailAddress);
-        mailMessage.setTo(data.getTo());
-        mailMessage.setSubject(data.getTitle());
-        mailMessage.setText(data.getMsg());
-        mailSender.send(mailMessage);
+        try {
+            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(mailAddress);
+            helper.setTo(data.getTo());
+            helper.setSubject(data.getTitle());
+            helper.setText(data.getMsg(), true); // true enables HTML
+            mailSender.send(message);
+        } catch (jakarta.mail.MessagingException e) {
+            e.printStackTrace();
+        }
     }
 }
