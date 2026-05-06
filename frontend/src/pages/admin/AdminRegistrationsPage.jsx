@@ -6,10 +6,10 @@ import { getAllRegistrations } from '../../services/registrationService.js';
 import { getAllWorkshops } from '../../services/workshopService.js';
 
 const statusOptions = [
-  { value: 'REGISTERED', label: 'REGISTERED' },
-  { value: 'PAID_PENDING', label: 'PAID_PENDING' },
-  { value: 'PAID', label: 'PAID' },
-  { value: 'CANCELLED', label: 'CANCELLED' },
+  { value: 'PENDING', label: 'PENDING' },
+  { value: 'SUCCESS', label: 'SUCCESS' },
+  { value: 'FAILED', label: 'FAILED' },
+  { value: 'CHECKED_IN', label: 'CHECKED_IN' },
 ];
 
 export default function AdminRegistrationsPage() {

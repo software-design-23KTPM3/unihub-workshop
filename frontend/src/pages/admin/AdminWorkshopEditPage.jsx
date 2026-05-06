@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WorkshopForm, { toWorkshopFormValues } from '../../components/admin/WorkshopForm.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
-import { getWorkshopById, updateWorkshop } from '../../services/workshopService.js';
+import { getWorkshopById, updateWorkshop, uploadWorkshopPdf } from '../../services/workshopService.js';
 
 export default function AdminWorkshopEditPage() {
   const { id } = useParams();
@@ -42,10 +42,13 @@ export default function AdminWorkshopEditPage() {
     };
   }, [id]);
 
-  const handleSubmit = async (payload) => {
+  const handleSubmit = async (payload, pdfFile) => {
     setSubmitting(true);
     try {
       await updateWorkshop(id, payload);
+      if (pdfFile) {
+        await uploadWorkshopPdf(id, pdfFile);
+      }
       messageApi.success('Cập nhật workshop thành công.');
       navigate('/admin/workshops');
     } finally {

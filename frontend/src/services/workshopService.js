@@ -158,6 +158,29 @@ export function updateWorkshop(id, payload) {
   return resolveMock(updated);
 }
 
+export function uploadWorkshopPdf(id, file) {
+  if (!USE_MOCK) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return httpClient.post(API_ENDPOINTS.admin.workshops.uploadPdf(id), formData);
+  }
+
+  const index = mockStore.workshops.findIndex((item) => item.id === id);
+
+  if (index === -1) {
+    return rejectMock('Workshop khÃ´ng tá»“n táº¡i.');
+  }
+
+  mockStore.workshops[index] = {
+    ...mockStore.workshops[index],
+    aiSummary:
+      mockStore.workshops[index].aiSummary ||
+      'AI summary Ä‘ang Ä‘Æ°á»£c xá»­ lÃ½ tá»« PDF Ä‘Ã£ táº£i lÃªn.',
+  };
+
+  return resolveMock(mockStore.workshops[index]);
+}
+
 export function cancelWorkshop(id) {
   if (!USE_MOCK) {
     return httpClient.patch(API_ENDPOINTS.admin.workshops.cancel(id));

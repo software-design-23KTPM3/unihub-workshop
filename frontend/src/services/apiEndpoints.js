@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
       create: '/admin/workshops',
       update: (id) => `/admin/workshops/${id}`,
       cancel: (id) => `/admin/workshops/${id}/cancel`,
+      uploadPdf: (id) => `/admin/workshops/${id}/pdf`,
     },
     registrations: '/admin/registrations',
     statistics: '/admin/statistics',

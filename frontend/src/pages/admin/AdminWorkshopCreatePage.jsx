@@ -3,17 +3,20 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkshopForm, { toWorkshopFormValues } from '../../components/admin/WorkshopForm.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
-import { createWorkshop } from '../../services/workshopService.js';
+import { createWorkshop, uploadWorkshopPdf } from '../../services/workshopService.js';
 
 export default function AdminWorkshopCreatePage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
-  const handleSubmit = async (payload) => {
+  const handleSubmit = async (payload, pdfFile) => {
     setSubmitting(true);
     try {
-      await createWorkshop(payload);
+      const createdWorkshop = await createWorkshop(payload);
+      if (pdfFile && createdWorkshop?.id) {
+        await uploadWorkshopPdf(createdWorkshop.id, pdfFile);
+      }
       messageApi.success('Tạo workshop thành công.');
       navigate('/admin/workshops');
     } finally {

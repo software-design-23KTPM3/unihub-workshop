@@ -8,13 +8,18 @@ import com.unihub.backend.core.repository.*;
 import com.unihub.backend.core.service.RegistrationService;
 import com.unihub.backend.core.service.RedisService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -47,6 +52,86 @@ public class RegistrationServiceImpl implements RegistrationService {
                 Registration reg = registrationRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Registration not found"));
                 return mapToDetailResponse(reg);
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<AdminRegistrationResponse> getAdminRegistrations(Authentication authentication, Map<String, String> filters) {
+                List<Registration> registrations = isAdmin(authentication)
+                                ? registrationRepository.findAllWithStudentAndWorkshop()
+                                : registrationRepository.findByOrganizerIdWithStudentAndWorkshop(currentUserId(authentication));
+
+                return registrations.stream()
+                                .filter(reg -> matchesFilters(reg, filters))
+                                .map(this::mapToAdminResponse)
+                                .sorted((first, second) -> nullToEmpty(second.getRegisteredAt()).compareTo(nullToEmpty(first.getRegisteredAt())))
+                                .collect(Collectors.toList());
+        }
+
+        private boolean matchesFilters(Registration reg, Map<String, String> filters) {
+                if (filters == null || filters.isEmpty()) {
+                        return true;
+                }
+                String workshopId = filters.get("workshopId");
+                if (workshopId != null && !workshopId.isBlank()
+                                && !Objects.equals(reg.getWorkshop().getId().toString(), workshopId)) {
+                        return false;
+                }
+                String status = filters.get("status");
+                if (status != null && !status.isBlank()
+                                && !Objects.equals(reg.getStatus().name(), status)) {
+                        return false;
+                }
+                return true;
+        }
+
+        private AdminRegistrationResponse mapToAdminResponse(Registration reg) {
+                Student student = reg.getStudent();
+                Workshop workshop = reg.getWorkshop();
+
+                return AdminRegistrationResponse.builder()
+                                .id(reg.getId())
+                                .studentId(student.getMssv())
+                                .studentName(student.getName())
+                                .studentEmail(student.getEmail())
+                                .workshopId(workshop.getId())
+                                .workshop(AdminRegistrationResponse.WorkshopSummary.of(workshop.getId(), workshop.getName()))
+                                .status(reg.getStatus())
+                                .paymentStatus(toPaymentStatus(reg))
+                                .qrCode(reg.getQrCode())
+                                .registeredAt(reg.getCreatedAt())
+                                .build();
+        }
+
+        private String toPaymentStatus(Registration reg) {
+                Workshop workshop = reg.getWorkshop();
+                if (!Boolean.TRUE.equals(workshop.getIsPaid()) || BigDecimal.ZERO.compareTo(workshop.getPrice()) >= 0) {
+                        return "FREE";
+                }
+                return reg.getStatus() == RegistrationStatus.SUCCESS || reg.getStatus() == RegistrationStatus.CHECKED_IN
+                                ? "PAID"
+                                : "PENDING";
+        }
+
+        private boolean isAdmin(Authentication authentication) {
+                return hasRole(authentication, "ROLE_ADMIN");
+        }
+
+        private boolean hasRole(Authentication authentication, String role) {
+                return authentication != null && authentication.getAuthorities().stream()
+                                .map(GrantedAuthority::getAuthority)
+                                .anyMatch(role::equals);
+        }
+
+        private String currentUserId(Authentication authentication) {
+                if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+                        throw new RuntimeException("Authentication is required");
+                }
+                return authentication.getName();
+        }
+
+        private String nullToEmpty(String value) {
+                return value == null ? "" : value;
         }
 
         private RegistrationDetailResponse mapToDetailResponse(Registration reg) {

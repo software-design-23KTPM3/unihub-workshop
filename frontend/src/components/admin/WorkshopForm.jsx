@@ -12,6 +12,7 @@ import {
   Upload,
 } from 'antd';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 
 const statusOptions = [
   { value: 'OPEN', label: 'OPEN' },
@@ -52,21 +53,17 @@ export function toWorkshopPayload(values) {
     price: Number(values.price || 0),
     tags: values.tags || [],
     status: values.status || 'OPEN',
-    aiSummary:
-      values.aiSummary || 'AI Summary generated from uploaded PDF',
+    aiSummary: values.aiSummary || '',
     isPaid: Number(values.price || 0) > 0,
   };
 }
 
 export default function WorkshopForm({ initialValues, submitting, submitText, onSubmit }) {
   const [form] = Form.useForm();
+  const [pdfFile, setPdfFile] = useState(null);
 
   const handleUploadChange = ({ fileList }) => {
-    if (fileList.length > 0) {
-      form.setFieldsValue({
-        aiSummary: 'AI Summary generated from uploaded PDF',
-      });
-    }
+    setPdfFile(fileList[0]?.originFileObj || null);
   };
 
   return (
@@ -75,7 +72,7 @@ export default function WorkshopForm({ initialValues, submitting, submitText, on
         form={form}
         layout="vertical"
         initialValues={initialValues}
-        onFinish={(values) => onSubmit(toWorkshopPayload(values))}
+        onFinish={(values) => onSubmit(toWorkshopPayload(values), pdfFile)}
         requiredMark={false}
       >
         <div className="admin-form-grid">
@@ -163,23 +160,26 @@ export default function WorkshopForm({ initialValues, submitting, submitText, on
           <Input.TextArea rows={2} />
         </Form.Item>
 
-        <Form.Item label="Upload PDF giả lập">
+        <Form.Item label="Upload PDF">
           <Upload.Dragger
             beforeUpload={() => false}
             maxCount={1}
             accept=".pdf"
             onChange={handleUploadChange}
+            onRemove={() => {
+              setPdfFile(null);
+            }}
           >
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
             <p className="ant-upload-text">Chọn PDF mô tả workshop</p>
-            <p className="ant-upload-hint">Không gửi file thật, chỉ dùng để demo AI Summary.</p>
+            <p className="ant-upload-hint">File sẽ được gửi để backend tạo AI Summary sau khi lưu workshop.</p>
           </Upload.Dragger>
         </Form.Item>
 
         <Form.Item label="AI Summary" name="aiSummary">
-          <Input.TextArea rows={3} placeholder="AI Summary generated from uploaded PDF" />
+          <Input.TextArea rows={3} placeholder="AI Summary sẽ được cập nhật sau khi worker xử lý PDF" />
         </Form.Item>
 
         <Space>

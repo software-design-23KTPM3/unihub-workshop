@@ -12,6 +12,7 @@ const configs = {
   PENDING: { color: 'gold', label: 'Đang chờ' },
   SUCCESS: { color: 'green', label: 'Thành công' },
   FAILED: { color: 'red', label: 'Thất bại' },
+  CHECKED_IN: { color: 'cyan', label: 'Đã check-in' },
   CANCELLED_REG: { color: 'red', label: 'Đã hủy' },
   FREE_PAYMENT: { color: 'green', label: 'Miễn phí' },
   VALID: { color: 'success', label: 'Vé hợp lệ' },
