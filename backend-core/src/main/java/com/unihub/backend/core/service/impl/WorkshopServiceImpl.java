@@ -38,6 +38,8 @@ import java.util.stream.Collectors;
 @Service
 public class WorkshopServiceImpl implements WorkshopService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WorkshopServiceImpl.class);
+
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Bangkok");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private static final String WORKSHOP_LIST_CACHE = "workshop_list";
@@ -57,6 +59,24 @@ public class WorkshopServiceImpl implements WorkshopService {
         this.redisTemplate = redisTemplate;
         this.rabbitTemplate = rabbitTemplate;
         this.fileStorageService = fileStorageService;
+    }
+
+    /**
+     * Tự động đồng bộ số lượng slot từ DB sang Redis khi ứng dụng khởi động.
+     * Hữu ích khi dữ liệu được seed trực tiếp bằng SQL.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void initWorkshopSlotsToRedis() {
+        log.info("Starting Workshop Slots synchronization to Redis...");
+        workshopRepository.findAll().forEach(workshop -> {
+            String key = WORKSHOP_SLOTS_PREFIX + workshop.getId();
+            // Chỉ set nếu chưa có trong Redis để tránh ghi đè dữ liệu đang chạy
+            if (Boolean.FALSE.equals(redisTemplate.hasKey(key))) {
+                redisTemplate.opsForValue().set(key, String.valueOf(workshop.getAvailableSlots()));
+                log.info("Initialized Workshop {} slots: {}", workshop.getId(), workshop.getAvailableSlots());
+            }
+        });
+        log.info("Workshop Slots synchronization COMPLETED.");
     }
 
     @Override
@@ -103,7 +123,7 @@ public class WorkshopServiceImpl implements WorkshopService {
         workshop.setSummaryText(request.getAiSummary());
 
         workshop = workshopRepository.save(workshop);
-        
+
         if (file != null && !file.isEmpty()) {
             handlePdfUpload(workshop, file);
         }
@@ -118,7 +138,8 @@ public class WorkshopServiceImpl implements WorkshopService {
 
     @Override
     @Transactional
-    public WorkshopResponse updateWorkshop(UUID id, WorkshopRequest request, MultipartFile file, Authentication authentication) {
+    public WorkshopResponse updateWorkshop(UUID id, WorkshopRequest request, MultipartFile file,
+            Authentication authentication) {
         validateRequest(request);
 
         Workshop workshop = findWorkshop(id);

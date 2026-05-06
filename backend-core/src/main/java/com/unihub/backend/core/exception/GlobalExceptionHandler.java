@@ -35,6 +35,16 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex.getMessage(), "INVALID_WORKSHOP", HttpStatus.BAD_REQUEST, request);
     }
 
+    @ExceptionHandler(RegistrationConflictException.class)
+    public ResponseEntity<ErrorResponse> handleRegistrationConflict(RegistrationConflictException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "REGISTRATION_CONFLICT", HttpStatus.CONFLICT, request);
+    }
+
+    @ExceptionHandler(WorkshopSoldOutException.class)
+    public ResponseEntity<ErrorResponse> handleWorkshopSoldOut(WorkshopSoldOutException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "WORKSHOP_SOLD_OUT", HttpStatus.BAD_REQUEST, request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()

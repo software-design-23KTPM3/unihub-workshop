@@ -22,9 +22,8 @@ public class RegistrationController {
     @PostMapping("/registrations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public RegistrationResponse createRegistration(
-            @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
             @Valid @RequestBody RegistrationRequest request) {
-        return registrationService.createRegistration(idempotencyKey, request);
+        return registrationService.createRegistration(request);
     }
 
     @GetMapping("/me/registrations")

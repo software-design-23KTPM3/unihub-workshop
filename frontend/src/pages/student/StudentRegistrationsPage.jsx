@@ -50,7 +50,7 @@ export default function StudentRegistrationsPage() {
       <PageHeader
         title="Đăng ký của tôi"
         eyebrow="Student Portal"
-        description="Theo dõi workshop đã đăng ký, trạng thái thanh toán và QR ticket."
+        description="Theo dõi workshop đã đăng ký và trạng thái thanh toán của bạn."
       />
 
       {error && <Alert type="error" showIcon message={error} />}
@@ -65,9 +65,16 @@ export default function StudentRegistrationsPage() {
             renderItem={(registration) => (
               <List.Item
                 actions={[
+                  registration.status === 'PENDING' && (
+                    <Link to={`/student/tickets/${registration.id}`} key="pay">
+                      <Button type="primary" style={{ backgroundColor: '#faad14', borderColor: '#faad14' }}>
+                        Thanh toán ngay
+                      </Button>
+                    </Link>
+                  ),
                   <Link to={`/student/tickets/${registration.id}`} key="ticket">
-                    <Button type="primary" icon={<QrcodeOutlined />}>
-                      Xem QR ticket
+                    <Button icon={<QrcodeOutlined />}>
+                      Xem chi tiết vé
                     </Button>
                   </Link>,
                 ]}

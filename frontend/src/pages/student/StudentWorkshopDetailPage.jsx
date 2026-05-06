@@ -292,34 +292,27 @@ export default function StudentWorkshopDetailPage() {
         open={Boolean(paymentRegistration)}
         onCancel={() => setPaymentRegistration(null)}
         footer={[
-          <Button key="timeout" danger onClick={handlePaymentTimeout}>
-            Giả lập timeout
+          <Button key="close" onClick={() => setPaymentRegistration(null)}>
+            Đóng
           </Button>,
           <Button
-            key="success"
+            key="history"
             type="primary"
-            loading={paymentStatus === 'success'}
-            onClick={handlePaymentSuccess}
+            onClick={() => navigate('/student/my-registrations')}
           >
-            Thanh toán thành công
+            Xem Lịch sử đăng ký
           </Button>,
         ]}
       >
         <Space direction="vertical" size="middle" className="full-width">
           <Alert
-            type={paymentStatus === 'timeout' ? 'warning' : 'info'}
+            type="info"
             showIcon
-            message={
-              paymentStatus === 'timeout'
-                ? 'Thanh toán timeout. Bạn có thể thử lại sau.'
-                : 'Đang giữ chỗ. Chọn kết quả thanh toán để demo luồng có phí.'
-            }
+            message="Yêu cầu của bạn đang được xử lý. Vui lòng vào mục 'Lịch sử đăng ký' để hoàn tất thanh toán trong vòng 30 phút để giữ chỗ chính thức."
           />
-          <Descriptions column={1}>
-            <Descriptions.Item label="Workshop">{workshop.title}</Descriptions.Item>
-            <Descriptions.Item label="Số tiền">{formatMoney(workshop.price)}</Descriptions.Item>
-            <Descriptions.Item label="Trạng thái">Payment pending</Descriptions.Item>
-          </Descriptions>
+          <Typography.Paragraph>
+            Lưu ý: Có thể mất một vài giây để đơn hàng xuất hiện trong lịch sử của bạn.
+          </Typography.Paragraph>
         </Space>
       </Modal>
     </div>

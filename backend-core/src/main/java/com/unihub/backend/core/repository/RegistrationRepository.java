@@ -10,4 +10,5 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
     java.util.List<Registration> findByStudentMssvOrderByCreatedAtDesc(String mssv);
     java.util.List<Registration> findByWorkshopId(UUID workshopId);
     boolean existsByStudentMssvAndWorkshopId(String mssv, UUID workshopId);
+    java.util.List<Registration> findByStatusAndCreatedAtBefore(com.unihub.backend.core.model.enums.RegistrationStatus status, java.time.ZonedDateTime dateTime);
 }

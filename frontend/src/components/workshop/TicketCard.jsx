@@ -21,16 +21,15 @@ export default function TicketCard({ registration, currentUser }) {
       <div className="ticket-card__top">
         <div>
           <Typography.Text className="ticket-card__eyebrow">
-            UniHub Workshop Ticket
+            Thông tin tham dự
           </Typography.Text>
           <Typography.Title level={2}>{workshop.title}</Typography.Title>
-          <StatusBadge status="VALID" />
-          <Typography.Paragraph className="ticket-card__hint">
-            Xuất trình QR tại quầy xác nhận trước giờ bắt đầu workshop.
+          <StatusBadge status={registration.status === 'SUCCESS' ? 'VALID' : 'PENDING'} />
+          <Typography.Paragraph className="ticket-card__hint" style={{ marginTop: 16 }}>
+            {registration.status === 'SUCCESS' 
+              ? 'Vé hợp lệ. Mã QR đã được gửi về email của bạn. Vui lòng xuất trình email tại quầy xác nhận.' 
+              : 'Đăng ký đang chờ thanh toán. Sau khi thanh toán thành công, mã QR sẽ được gửi về email của bạn.'}
           </Typography.Paragraph>
-        </div>
-        <div className="ticket-card__qr">
-          <QRCodeCanvas value={registration.qrCode} size={168} />
         </div>
       </div>
 
@@ -53,7 +52,6 @@ export default function TicketCard({ registration, currentUser }) {
           <Typography.Text>
             <CheckCircleOutlined /> Mã vé: {registration.id}
           </Typography.Text>
-          <Typography.Text type="secondary">QR: {registration.qrCode}</Typography.Text>
           <StatusBadge status={registration.paymentStatus} type="payment" />
         </Space>
       </div>

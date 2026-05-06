@@ -6,7 +6,7 @@ import LoadingState from '../../components/common/LoadingState.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import TicketCard from '../../components/workshop/TicketCard.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
-import { getRegistrationById } from '../../services/registrationService.js';
+import { getRegistrationById, completeMockPayment } from '../../services/registrationService.js';
 
 export default function StudentTicketPage() {
   const { registrationId } = useParams();
@@ -14,6 +14,19 @@ export default function StudentTicketPage() {
   const [registration, setRegistration] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paying, setPaying] = useState(false);
+
+  const handlePaymentSuccess = async () => {
+    setPaying(true);
+    try {
+      const updated = await completeMockPayment(registrationId);
+      setRegistration(updated);
+    } catch (err) {
+      setError('Thanh toán thất bại: ' + err.message);
+    } finally {
+      setPaying(false);
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -71,19 +84,35 @@ export default function StudentTicketPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="QR Ticket"
-        description="Xuất trình vé này tại quầy xác nhận của workshop."
+        title="Thông tin vé"
+        description="Thông tin chi tiết về buổi workshop bạn đã đăng ký."
         extra={
           <Link to="/student/my-registrations">
             <Button>Đăng ký của tôi</Button>
           </Link>
         }
       />
-      {registration.status === 'PAID_PENDING' && (
+      {registration.status === 'PENDING' ? (
         <Alert
           type="warning"
           showIcon
-          message="Vé đang chờ thanh toán. QR chỉ hợp lệ sau khi thanh toán thành công."
+          message="Vé đang chờ thanh toán. Sau khi thanh toán, mã QR sẽ được gửi về email của bạn."
+          action={
+            <Button 
+              type="primary" 
+              loading={paying} 
+              onClick={handlePaymentSuccess}
+              style={{ backgroundColor: '#faad14', borderColor: '#faad14' }}
+            >
+              Thanh toán ngay (Demo)
+            </Button>
+          }
+        />
+      ) : (
+        <Alert
+          type="success"
+          showIcon
+          message="Vé hợp lệ. Mã QR đã được gửi về email của bạn."
         />
       )}
       <TicketCard registration={registration} currentUser={currentUser} />

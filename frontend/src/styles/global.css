@@ -104,9 +104,9 @@ a {
 
 .state-card {
   border: 1px solid #e4eaf3;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 12px 34px rgba(15, 47, 95, 0.08);
+  box-shadow: 0 4px 12px rgba(15, 47, 95, 0.04);
 }
 
 .status-badge,
@@ -275,8 +275,8 @@ a {
 .ticket-card,
 .skeleton-card {
   border: 1px solid #e5eaf2;
-  box-shadow: 0 12px 30px rgba(15, 39, 71, 0.08);
-  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 39, 71, 0.05);
+  border-radius: 12px;
 }
 
 .workshop-filter-grid {
@@ -363,9 +363,7 @@ a {
 
 .ticket-card {
   overflow: hidden;
-  background:
-    radial-gradient(circle at right center, #dcebff 0 90px, transparent 92px),
-    linear-gradient(90deg, #ffffff 0%, #ffffff 66%, #eef6ff 66%, #eef6ff 100%);
+  background: #ffffff;
   border: 1px solid #dce8f7;
 }
 
@@ -386,16 +384,6 @@ a {
   max-width: 520px;
   margin-top: 12px;
   color: #667085;
-}
-
-.ticket-card__qr {
-  display: grid;
-  padding: 14px;
-  place-items: center;
-  background: #ffffff;
-  border: 1px solid #d7e8ff;
-  border-radius: 14px;
-  box-shadow: 0 16px 34px rgba(23, 105, 224, 0.14);
 }
 
 .ticket-card__details {
