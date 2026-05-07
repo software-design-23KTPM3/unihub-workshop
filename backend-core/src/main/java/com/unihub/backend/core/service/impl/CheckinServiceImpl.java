@@ -4,13 +4,16 @@ import com.unihub.backend.core.model.dto.CheckinEvent;
 import com.unihub.backend.core.model.dto.CheckinResult;
 import com.unihub.backend.core.model.dto.CheckinSyncResponse;
 import com.unihub.backend.core.model.entity.Registration;
+import com.unihub.backend.core.model.entity.Workshop;
 import com.unihub.backend.core.model.enums.RegistrationStatus;
 import com.unihub.backend.core.repository.RegistrationRepository;
 import com.unihub.backend.core.service.CheckinService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+<<<<<<<HEAD
+import java.util.ArrayList;=======
+import java.time.ZonedDateTime;>>>>>>>4d d27a7(checkin app)
 import java.util.List;
 import java.util.Optional;
 
@@ -26,9 +29,12 @@ public class CheckinServiceImpl implements CheckinService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CheckinServiceImpl.class);
 
     private final RegistrationRepository registrationRepository;
+    private final com.unihub.backend.core.repository.StudentRepository studentRepository;
 
-    public CheckinServiceImpl(RegistrationRepository registrationRepository) {
+    public CheckinServiceImpl(RegistrationRepository registrationRepository,
+            com.unihub.backend.core.repository.StudentRepository studentRepository) {
         this.registrationRepository = registrationRepository;
+        this.studentRepository = studentRepository;
     }
 
     @Override
@@ -131,5 +137,44 @@ public class CheckinServiceImpl implements CheckinService {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    @Override
+    @Transactional
+    public void checkin(CheckinEvent event) {
+        // 1. Kiểm tra sinh viên có tồn tại không
+        if (!studentRepository.existsById(event.getStudentId())) {
+            throw new RuntimeException("Mã sinh viên không tồn tại trong hệ thống!");
+        }
+
+        // 2. Kiểm tra đăng ký của sinh viên cho workshop này
+        Registration registration = registrationRepository
+                .findByStudentMssvAndWorkshopId(event.getStudentId(), event.getWorkshopId())
+                .orElseThrow(() -> new RuntimeException("Sinh viên chưa đăng ký tham gia workshop này!"));
+
+        if (registration.getStatus() == RegistrationStatus.CHECKED_IN) {
+            log.info("Student {} already checked in for workshop {}", event.getStudentId(), event.getWorkshopId());
+            throw new RuntimeException("Sinh viên đã điểm danh rồi!");
+        }
+
+        if (registration.getStatus() != RegistrationStatus.SUCCESS) {
+            throw new RuntimeException("Vé không hợp lệ (Trạng thái: " + registration.getStatus() + ")");
+        }
+
+        // Kiểm tra thời gian workshop
+        Workshop workshop = registration.getWorkshop();
+        ZonedDateTime now = ZonedDateTime.now();
+        if (now.isBefore(workshop.getStartTime().minusMinutes(60))) {
+            throw new RuntimeException("Workshop chưa bắt đầu. Điểm danh chỉ mở trước 60 phút.");
+        }
+        if (now.isAfter(workshop.getEndTime().plusMinutes(30))) {
+            throw new RuntimeException("Workshop đã kết thúc, không thể điểm danh.");
+        }
+
+        registration.setStatus(RegistrationStatus.CHECKED_IN);
+        registration.setCheckedInAt(event.getCheckinAt() != null ? event.getCheckinAt() : ZonedDateTime.now());
+        registrationRepository.save(registration);
+
+        log.info("Successfully checked in student {} for workshop {}", event.getStudentId(), event.getWorkshopId());
     }
 }

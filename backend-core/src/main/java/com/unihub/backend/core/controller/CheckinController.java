@@ -19,8 +19,14 @@ public class CheckinController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STAFF', 'CHECKIN_STAFF', 'ADMIN')")
-    public CheckinSyncResponse syncCheckins(@RequestBody List<CheckinEvent> events) {
-        return checkinService.syncCheckins(events);
+    @PreAuthorize("hasAnyRole('HUMAN_RESOURCE', 'ADMIN')")
+    public void syncCheckins(@RequestBody List<CheckinEvent> events) {
+        checkinService.syncCheckins(events);
+    }
+
+    @PostMapping("/single")
+    @PreAuthorize("hasAnyRole('HUMAN_RESOURCE', 'ADMIN')")
+    public void checkin(@RequestBody CheckinEvent event) {
+        checkinService.checkin(event);
     }
 }

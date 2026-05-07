@@ -66,8 +66,11 @@ public class LoginView extends AppCompatActivity {
                         
                         // Just a simple hack for roles based on username
                         Intent intent;
-                        if (username.startsWith("organizer")) {
-                            editor.putString("userRole", "STAFF");
+                        if (username.startsWith("hr")) {
+                            editor.putString("userRole", "HUMAN_RESOURCE");
+                            intent = new Intent(LoginView.this, StaffPortalView.class);
+                        } else if (username.startsWith("organizer")) {
+                            editor.putString("userRole", "ORGANIZER");
                             intent = new Intent(LoginView.this, StaffPortalView.class);
                         } else {
                             editor.putString("userRole", "STUDENT");

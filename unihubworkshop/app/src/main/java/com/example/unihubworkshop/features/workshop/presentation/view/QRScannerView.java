@@ -26,11 +26,14 @@ import com.google.mlkit.vision.common.InputImage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.json.JSONObject;
+import org.json.JSONException;
 
 public class QRScannerView extends AppCompatActivity {
     private static final int PERMISSION_CODE = 1001;
     private PreviewView previewView;
     private ExecutorService cameraExecutor;
+    private boolean isProcessing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,10 +95,10 @@ public class QRScannerView extends AppCompatActivity {
                                 .addOnSuccessListener(barcodes -> {
                                     for (Barcode barcode : barcodes) {
                                         String rawValue = barcode.getRawValue();
-                                        if (rawValue != null) {
+                                        if (rawValue != null && !isProcessing) {
+                                            isProcessing = true;
                                             runOnUiThread(() -> {
-                                                Toast.makeText(QRScannerView.this, "Check-in Successful: " + rawValue, Toast.LENGTH_LONG).show();
-                                                finish();
+                                                processScannedData(rawValue);
                                             });
                                         }
                                     }
@@ -116,6 +119,75 @@ public class QRScannerView extends AppCompatActivity {
                 Log.e("QRScanner", "Error starting camera", e);
             }
         }, ContextCompat.getMainExecutor(this));
+    }
+
+    private void processScannedData(String rawData) {
+        String currentWorkshopId = getIntent().getStringExtra("workshop_id");
+        if (currentWorkshopId == null) {
+            Toast.makeText(this, "Error: Current Workshop ID missing", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        try {
+            JSONObject json = new JSONObject(rawData);
+            String studentId = json.getString("studentId");
+            String qrWorkshopId = json.getString("workshopId");
+
+            // KIỂM TRA: Workshop của QR có đúng là workshop đang chọn không?
+            if (!currentWorkshopId.equalsIgnoreCase(qrWorkshopId)) {
+                Toast.makeText(this, "Lỗi: Vé này thuộc về workshop khác!", Toast.LENGTH_LONG).show();
+                isProcessing = false; // Cho phép quét lại
+                return;
+            }
+
+            performCheckin(studentId, currentWorkshopId);
+
+        } catch (JSONException e) {
+            Toast.makeText(this, "Lỗi: Mã QR không đúng định dạng UniHub!", Toast.LENGTH_SHORT).show();
+            isProcessing = false; // Cho phép quét lại
+        }
+    }
+
+    private void performCheckin(String studentId, String workshopId) {
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("UTC"));
+        String timestamp = now.format(java.time.format.DateTimeFormatter.ISO_INSTANT);
+
+        com.example.unihubworkshop.features.workshop.data.datasource.CheckinEvent event = 
+            new com.example.unihubworkshop.features.workshop.data.datasource.CheckinEvent(studentId, workshopId, timestamp);
+        
+        com.example.unihubworkshop.features.workshop.data.datasource.CheckinApi checkinApi = 
+            com.example.unihubworkshop.core.network.RetrofitClient.getClient(this).create(com.example.unihubworkshop.features.workshop.data.datasource.CheckinApi.class);
+
+        // Sử dụng checkinSingle để nhận feedback trực tiếp
+        checkinApi.checkinSingle(event).enqueue(new retrofit2.Callback<Void>() {
+            @Override
+            public void onResponse(retrofit2.Call<Void> call, retrofit2.Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Toast.makeText(QRScannerView.this, "Check-in thành công cho: " + studentId, Toast.LENGTH_LONG).show();
+                } else {
+                    String errorMsg = "Check-in thất bại!";
+                    try {
+                        // Cố gắng lấy message từ error body
+                        String errorBody = response.errorBody().string();
+                        JSONObject errorJson = new JSONObject(errorBody);
+                        if (errorJson.has("message")) {
+                            errorMsg = errorJson.getString("message");
+                        }
+                    } catch (Exception e) {
+                        errorMsg += " (Code: " + response.code() + ")";
+                    }
+                    Toast.makeText(QRScannerView.this, errorMsg, Toast.LENGTH_LONG).show();
+                }
+                finish();
+            }
+
+            @Override
+            public void onFailure(retrofit2.Call<Void> call, Throwable t) {
+                Toast.makeText(QRScannerView.this, "Lỗi kết nối: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
     }
 
     @Override

@@ -36,6 +36,10 @@
       {
         "name": "STAFF",
         "description": "Event and check-in staff"
+      },
+      {
+        "name": "HUMAN_RESOURCE",
+        "description": "HR staff for check-ins"
       }
     ]
   },
@@ -56,6 +60,7 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       },
+      "directAccessGrantsEnabled": true,
       "protocolMappers": [
         {
           "name": "realm roles mapping",
@@ -85,7 +90,7 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": true,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": true
     }
   ],
   "users": [
@@ -136,6 +141,57 @@
       ],
       "realmRoles": [
         "ORGANIZER"
+      ]
+    },
+    {
+      "username": "hr_test",
+      "enabled": true,
+      "email": "hr@test.com",
+      "firstName": "HR",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "HUMAN_RESOURCE"
+      ]
+    },
+    {
+      "username": "hr_staff_1",
+      "enabled": true,
+      "email": "hr1@test.com",
+      "firstName": "Staff",
+      "lastName": "One",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "HUMAN_RESOURCE"
+      ]
+    },
+    {
+      "username": "hr_staff_2",
+      "enabled": true,
+      "email": "hr2@test.com",
+      "firstName": "Staff",
+      "lastName": "Two",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "HUMAN_RESOURCE"
       ]
     }
   ]

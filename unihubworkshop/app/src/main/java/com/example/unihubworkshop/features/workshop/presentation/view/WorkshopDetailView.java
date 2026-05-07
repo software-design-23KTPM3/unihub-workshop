@@ -38,9 +38,20 @@ public class WorkshopDetailView extends AppCompatActivity {
         btnBack.setOnClickListener(v -> finish());
 
         View btnScan = findViewById(R.id.scanContainer);
-        btnScan.setOnClickListener(v -> {
-            startActivity(new Intent(this, QRScannerView.class));
-        });
+        
+        android.content.SharedPreferences prefs = getSharedPreferences("UserPrefs", MODE_PRIVATE);
+        String role = prefs.getString("userRole", "");
+        
+        if ("HUMAN_RESOURCE".equals(role)) {
+            btnScan.setVisibility(View.VISIBLE);
+            btnScan.setOnClickListener(v -> {
+                Intent intent = new Intent(this, QRScannerView.class);
+                intent.putExtra("workshop_id", getIntent().getStringExtra("workshop_id"));
+                startActivity(intent);
+            });
+        } else {
+            btnScan.setVisibility(View.GONE);
+        }
     }
 
     private void observeViewModel() {
