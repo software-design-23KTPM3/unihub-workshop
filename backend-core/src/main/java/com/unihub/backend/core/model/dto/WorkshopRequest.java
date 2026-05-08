@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -29,6 +30,12 @@ public class WorkshopRequest {
     @NotNull
     @JsonFormat(pattern = "HH:mm")
     private LocalTime endTime;
+    @NotNull
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm")
+    private LocalDateTime registrationStartTime;
+    @NotNull
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm")
+    private LocalDateTime registrationEndTime;
     @NotNull
     @Min(1)
     private Integer capacity;
@@ -60,6 +67,10 @@ public class WorkshopRequest {
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+    public LocalDateTime getRegistrationStartTime() { return registrationStartTime; }
+    public void setRegistrationStartTime(LocalDateTime registrationStartTime) { this.registrationStartTime = registrationStartTime; }
+    public LocalDateTime getRegistrationEndTime() { return registrationEndTime; }
+    public void setRegistrationEndTime(LocalDateTime registrationEndTime) { this.registrationEndTime = registrationEndTime; }
     public Integer getCapacity() { return capacity; }
     public void setCapacity(Integer capacity) { this.capacity = capacity; }
     public BigDecimal getPrice() { return price; }

@@ -1,32 +1,20 @@
-import { Alert, Button, Col, Row, Typography, message } from 'antd';
+import { Alert, Button, Col, Row, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import EmptyState from '../../components/common/EmptyState.jsx';
 import LoadingState from '../../components/common/LoadingState.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import WorkshopCard from '../../components/workshop/WorkshopCard.jsx';
 import WorkshopFilterBar from '../../components/workshop/WorkshopFilterBar.jsx';
+import { getMyRegistrations } from '../../services/registrationService.js';
 import { getAllWorkshops } from '../../services/workshopService.js';
-import { httpClient } from '../../services/httpClient.js';
 
 export default function StudentWorkshopsPage() {
   const [workshops, setWorkshops] = useState([]);
   const [allWorkshops, setAllWorkshops] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
   const [filters, setFilters] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [stressLoading, setStressLoading] = useState(false);
-
-  const handleStressTest = async () => {
-    setStressLoading(true);
-    try {
-      const result = await httpClient.get('/test/stress');
-      message.success(`Stress test ok: ${result.user_id} (${result.role})`);
-    } catch (err) {
-      message.error(`Stress test failed: ${err.message}`);
-    } finally {
-      setStressLoading(false);
-    }
-  };
 
   useEffect(() => {
     let ignore = false;
@@ -58,10 +46,14 @@ export default function StudentWorkshopsPage() {
       setError('');
 
       try {
-        const result = await getAllWorkshops(filters);
+        const [workshopResult, registrationResult] = await Promise.all([
+          getAllWorkshops(filters),
+          getMyRegistrations(),
+        ]);
 
         if (!ignore) {
-          setWorkshops(result);
+          setWorkshops(workshopResult);
+          setRegistrations(registrationResult);
         }
       } catch (loadError) {
         if (!ignore) {
@@ -91,6 +83,46 @@ export default function StudentWorkshopsPage() {
     [allWorkshops],
   );
 
+  const registrationsByWorkshopId = useMemo(() => {
+    const map = new Map();
+
+    registrations.forEach((registration) => {
+      const workshopId = registration.workshopId || registration.workshop?.id;
+      if (workshopId && registration.status !== 'CANCELLED') {
+        map.set(workshopId, registration);
+      }
+    });
+
+    return map;
+  }, [registrations]);
+
+  const handleRegistered = (workshop, registration) => {
+    const registrationId = registration.registrationId || registration.id;
+    const normalized = {
+      ...registration,
+      id: registrationId,
+      workshopId: workshop.id,
+      workshop,
+    };
+
+    setRegistrations((current) => {
+      const withoutCurrentWorkshop = current.filter((item) => {
+        const itemWorkshopId = item.workshopId || item.workshop?.id;
+        return itemWorkshopId !== workshop.id;
+      });
+
+      return [normalized, ...withoutCurrentWorkshop];
+    });
+
+    setWorkshops((current) =>
+      current.map((item) =>
+        item.id === workshop.id
+          ? { ...item, registeredCount: Math.min((item.registeredCount || 0) + 1, item.capacity || 0) }
+          : item,
+      ),
+    );
+  };
+
   return (
     <div className="page-stack">
       <section className="student-hero">
@@ -108,17 +140,6 @@ export default function StudentWorkshopsPage() {
         description="Lọc theo chủ đề, ngày, phòng và trạng thái để chọn phiên phù hợp."
       />
 
-      {/* <div style={{ padding: '0 24px', marginBottom: 16 }}>
-        <Button 
-          type="primary" 
-          danger 
-          loading={stressLoading} 
-          onClick={handleStressTest}
-        >
-          Run Stress Test API
-        </Button>
-      </div> */}
-
       <WorkshopFilterBar
         topics={topics}
         rooms={rooms}
@@ -126,7 +147,14 @@ export default function StudentWorkshopsPage() {
         onChange={setFilters}
       />
 
-      {error && <Alert type="error" showIcon message={error} />}
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message={error}
+          action={<Button onClick={() => setFilters((current) => ({ ...current }))}>Tải lại</Button>}
+        />
+      )}
 
       {loading ? (
         <Row gutter={[16, 16]}>
@@ -140,7 +168,11 @@ export default function StudentWorkshopsPage() {
         <Row gutter={[16, 16]}>
           {workshops.map((workshop) => (
             <Col xs={24} md={12} xl={8} key={workshop.id}>
-              <WorkshopCard workshop={workshop} />
+              <WorkshopCard
+                workshop={workshop}
+                myRegistration={registrationsByWorkshopId.get(workshop.id)}
+                onRegistered={handleRegistered}
+              />
             </Col>
           ))}
         </Row>

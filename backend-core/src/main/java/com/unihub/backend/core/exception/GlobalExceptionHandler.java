@@ -45,6 +45,16 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex.getMessage(), "WORKSHOP_SOLD_OUT", HttpStatus.BAD_REQUEST, request);
     }
 
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ErrorResponse> handlePayment(PaymentException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "PAYMENT_ERROR", HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(PaymentGatewayUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentGatewayUnavailable(PaymentGatewayUnavailableException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), "PAYMENT_GATEWAY_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE, request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()

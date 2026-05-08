@@ -5,6 +5,10 @@ spring:
   threads:
     virtual:
       enabled: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
   application:
     name: backend-core
   datasource:
@@ -38,8 +42,17 @@ resilience4j:
     instances:
       paymentGateway:
         registerHealthIndicator: true
-        slidingWindowSize: 20
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 4
         failureRateThreshold: 50
-        waitDurationInOpenState: 30s
-        permittedNumberOfCallsInHalfOpenState: 3
-        minimumNumberOfCalls: 10
+        waitDurationInOpenState: 20s
+        permittedNumberOfCallsInHalfOpenState: 2
+        minimumNumberOfCalls: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+app:
+  frontend-base-url: http://localhost:3000
+  payment:
+    sandbox-base-url: http://localhost:8090
+    webhook-url: http://localhost:8081/api/payments/webhook
+    webhook-secret: dev-payment-secret

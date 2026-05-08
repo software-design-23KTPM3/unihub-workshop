@@ -28,7 +28,15 @@ public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationTo
                 extractResourceRoles(jwt).stream()
         ).collect(Collectors.toSet());
 
-        return new JwtAuthenticationToken(jwt, authorities, jwt.getClaim("preferred_username"));
+        return new JwtAuthenticationToken(jwt, authorities, principalName(jwt));
+    }
+
+    private String principalName(Jwt jwt) {
+        String studentId = jwt.getClaimAsString("studentId");
+        if (studentId != null && !studentId.isBlank()) {
+            return studentId;
+        }
+        return jwt.getClaimAsString("preferred_username");
     }
 
     private Collection<? extends GrantedAuthority> extractResourceRoles(Jwt jwt) {

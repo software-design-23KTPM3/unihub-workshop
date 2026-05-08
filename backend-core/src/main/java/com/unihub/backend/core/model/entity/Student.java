@@ -20,6 +20,7 @@ public class Student {
     @Column(nullable = false)
     private String name;
     private String birthday;
+    @Column(nullable = false)
     private String status;
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

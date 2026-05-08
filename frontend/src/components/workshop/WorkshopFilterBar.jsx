@@ -1,9 +1,9 @@
 import { Button, Card, DatePicker, Form, Input, Select } from 'antd';
 
 const statusOptions = [
-  { value: 'OPEN', label: 'OPEN' },
-  { value: 'FULL', label: 'FULL' },
-  { value: 'CANCELLED', label: 'CANCELLED' },
+  { value: 'OPEN', label: 'Đang mở' },
+  { value: 'FULL', label: 'Đã đầy' },
+  { value: 'CANCELLED', label: 'Đã hủy' },
 ];
 
 const priceOptions = [

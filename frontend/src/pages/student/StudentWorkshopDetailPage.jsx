@@ -1,6 +1,7 @@
 import {
   ArrowLeftOutlined,
   CalendarOutlined,
+  ClockCircleOutlined,
   EnvironmentOutlined,
   ReadOutlined,
   TeamOutlined,
@@ -19,18 +20,15 @@ import {
   Statistic,
   Typography,
 } from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import LoadingState from '../../components/common/LoadingState.jsx';
 import StatusBadge from '../../components/common/StatusBadge.jsx';
-import {
-  completeMockPayment,
-  getMyRegistrations,
-  registerWorkshop,
-} from '../../services/registrationService.js';
+import { getMyRegistrations, registerWorkshop } from '../../services/registrationService.js';
 import { getWorkshopById } from '../../services/workshopService.js';
-import { formatDate, formatMoney } from '../../utils/formatters.js';
+import { formatDate, formatDateTime, formatMoney } from '../../utils/formatters.js';
 
 export default function StudentWorkshopDetailPage() {
   const { id } = useParams();
@@ -41,8 +39,8 @@ export default function StudentWorkshopDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successRegistration, setSuccessRegistration] = useState(null);
-  const [paymentRegistration, setPaymentRegistration] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState('idle');
+  const [pendingRegistration, setPendingRegistration] = useState(null);
+  const pendingPayment = myRegistration?.status === 'PENDING' || myRegistration?.paymentStatus === 'PENDING';
 
   useEffect(() => {
     let ignore = false;
@@ -62,7 +60,8 @@ export default function StudentWorkshopDetailPage() {
           setMyRegistration(
             registrations.find(
               (registration) =>
-                registration.workshopId === id && registration.status !== 'CANCELLED',
+                (registration.workshopId === id || registration.workshop?.id === id) &&
+                registration.status !== 'CANCELLED',
             ) || null,
           );
         }
@@ -109,6 +108,18 @@ export default function StudentWorkshopDetailPage() {
       return 'Bạn đã đăng ký workshop này.';
     }
 
+    const registrationStart = dayjs(workshop.registrationStartTime);
+    const registrationEnd = dayjs(workshop.registrationEndTime);
+    const now = dayjs();
+
+    if (registrationStart.isValid() && now.isBefore(registrationStart)) {
+      return `Workshop mở đăng ký từ ${formatDateTime(workshop.registrationStartTime)}.`;
+    }
+
+    if (registrationEnd.isValid() && now.isAfter(registrationEnd)) {
+      return 'Workshop đã hết hạn đăng ký.';
+    }
+
     return '';
   }, [myRegistration, workshop]);
 
@@ -123,33 +134,33 @@ export default function StudentWorkshopDetailPage() {
 
     try {
       const registration = await registerWorkshop(workshop.id);
+      const registrationId = registration.registrationId || registration.id;
 
-      if (workshop.isPaid) {
-        setPaymentRegistration(registration);
-        setPaymentStatus('pending');
+      if (registration.status === 'PENDING') {
+        setPendingRegistration(registration);
+        setMyRegistration({
+          id: registrationId,
+          workshop,
+          workshopId: workshop.id,
+          status: registration.status,
+          paymentStatus: 'PENDING',
+        });
         return;
       }
 
       setSuccessRegistration(registration);
-      setMyRegistration(registration);
+      setMyRegistration({
+        id: registrationId,
+        workshop,
+        workshopId: workshop.id,
+        status: registration.status,
+        paymentStatus: 'FREE',
+      });
     } catch (registerError) {
       setError(registerError.message);
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handlePaymentSuccess = async () => {
-    setPaymentStatus('success');
-    const paidRegistration = await completeMockPayment(paymentRegistration.registrationId);
-    setMyRegistration(paidRegistration);
-    setPaymentRegistration(null);
-    navigate(`/student/tickets/${paidRegistration.id}`);
-  };
-
-  const handlePaymentTimeout = () => {
-    setPaymentStatus('timeout');
-    setError('Thanh toán quá thời gian. Đăng ký đang ở trạng thái chờ thanh toán.');
   };
 
   if (loading) {
@@ -180,6 +191,9 @@ export default function StudentWorkshopDetailPage() {
           <Space wrap>
             <StatusBadge status={workshop.status} />
             <StatusBadge status={workshop.isPaid ? 'PAID_EVENT' : 'FREE'} type="price" />
+            {myRegistration && (
+              <StatusBadge status={pendingPayment ? 'PAID_PENDING' : 'REGISTERED'} />
+            )}
           </Space>
           <Typography.Title>{workshop.title}</Typography.Title>
           <Typography.Paragraph>{workshop.description}</Typography.Paragraph>
@@ -192,6 +206,10 @@ export default function StudentWorkshopDetailPage() {
             </Typography.Text>
             <Typography.Text>
               <EnvironmentOutlined /> {workshop.room}
+            </Typography.Text>
+            <Typography.Text>
+              <ClockCircleOutlined /> Đăng ký: {formatDateTime(workshop.registrationStartTime)} -{' '}
+              {formatDateTime(workshop.registrationEndTime)}
             </Typography.Text>
           </Space>
         </Space>
@@ -206,13 +224,16 @@ export default function StudentWorkshopDetailPage() {
                 {workshop.speakerName} - {workshop.speakerTitle}
               </Descriptions.Item>
               <Descriptions.Item label="Giá">{formatMoney(workshop.price)}</Descriptions.Item>
+              <Descriptions.Item label="Thời gian đăng ký">
+                {formatDateTime(workshop.registrationStartTime)} - {formatDateTime(workshop.registrationEndTime)}
+              </Descriptions.Item>
               <Descriptions.Item label="Sơ đồ phòng">
                 {workshop.roomMapText || workshop.roomMapUrl}
               </Descriptions.Item>
             </Descriptions>
           </Card>
 
-          <Card title="AI Summary" bordered={false} className="section-card">
+          <Card title="Tóm tắt workshop" bordered={false} className="section-card">
             <Typography.Paragraph>
               <ReadOutlined /> {workshop.aiSummary}
             </Typography.Paragraph>
@@ -240,9 +261,14 @@ export default function StudentWorkshopDetailPage() {
               </Row>
 
               {myRegistration ? (
-                <Link to={`/student/tickets/${myRegistration.id}`}>
-                  <Button type="primary" size="large" block>
-                    Xem QR ticket
+                <Link to={`/student/tickets/${myRegistration.id || myRegistration.registrationId}`}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    block
+                    style={pendingPayment ? { backgroundColor: '#faad14', borderColor: '#faad14' } : undefined}
+                  >
+                    {pendingPayment ? 'Hoàn tất thanh toán' : 'Xem QR ticket'}
                   </Button>
                 </Link>
               ) : (
@@ -254,12 +280,23 @@ export default function StudentWorkshopDetailPage() {
                   disabled={Boolean(unavailableReason)}
                   onClick={handleRegister}
                 >
-                  Đăng ký
+                  {workshop.isPaid ? 'Giữ chỗ và thanh toán sau' : 'Đăng ký'}
                 </Button>
               )}
 
               {unavailableReason && (
-                <Alert type="warning" showIcon message={unavailableReason} />
+                <Alert
+                  type={myRegistration && !pendingPayment ? 'success' : 'warning'}
+                  showIcon
+                  message={unavailableReason}
+                  description={
+                    myRegistration
+                      ? pendingPayment
+                        ? 'Chỗ của bạn đã được giữ. Mở trang vé để tiếp tục thanh toán.'
+                        : 'Bạn có thể mở QR ticket từ nút bên trên.'
+                      : undefined
+                  }
+                />
               )}
             </Space>
           </Card>
@@ -274,7 +311,7 @@ export default function StudentWorkshopDetailPage() {
           <Button
             key="ticket"
             type="primary"
-            onClick={() => navigate(`/student/tickets/${successRegistration?.registrationId}`)}
+            onClick={() => navigate(`/student/tickets/${successRegistration?.registrationId || successRegistration?.id}`)}
           >
             Xem ticket
           </Button>,
@@ -288,32 +325,40 @@ export default function StudentWorkshopDetailPage() {
       </Modal>
 
       <Modal
-        title="Thanh toán giả lập"
-        open={Boolean(paymentRegistration)}
-        onCancel={() => setPaymentRegistration(null)}
+        title="Đã giữ chỗ chờ thanh toán"
+        open={Boolean(pendingRegistration)}
+        onCancel={() => setPendingRegistration(null)}
         footer={[
-          <Button key="close" onClick={() => setPaymentRegistration(null)}>
-            Đóng
+          <Button key="close" onClick={() => setPendingRegistration(null)}>
+            Ở lại trang này
           </Button>,
+          pendingRegistration?.registrationId && (
+            <Button key="ticket" onClick={() => navigate(`/student/tickets/${pendingRegistration.registrationId}`)}>
+              Xem vé tạm
+            </Button>
+          ),
           <Button
             key="history"
             type="primary"
-            onClick={() => navigate('/student/my-registrations')}
+            onClick={() =>
+              navigate('/student/my-registrations', {
+                state: {
+                  registrationAccepted: true,
+                  registrationId: pendingRegistration?.registrationId,
+                  message: pendingRegistration?.message,
+                },
+              })
+            }
           >
-            Xem Lịch sử đăng ký
+            Mở đăng ký của tôi
           </Button>,
         ]}
       >
-        <Space direction="vertical" size="middle" className="full-width">
-          <Alert
-            type="info"
-            showIcon
-            message="Yêu cầu của bạn đang được xử lý. Vui lòng vào mục 'Lịch sử đăng ký' để hoàn tất thanh toán trong vòng 30 phút để giữ chỗ chính thức."
-          />
-          <Typography.Paragraph>
-            Lưu ý: Có thể mất một vài giây để đơn hàng xuất hiện trong lịch sử của bạn.
-          </Typography.Paragraph>
-        </Space>
+        <Result
+          status="info"
+          title="Chỗ của bạn đang được giữ trong hệ thống."
+          subTitle={pendingRegistration?.message || 'Vào Đăng ký của tôi để hoàn tất thanh toán.'}
+        />
       </Modal>
     </div>
   );

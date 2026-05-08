@@ -1,11 +1,11 @@
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, message } from 'antd';
+import { Button, Card, DatePicker, Descriptions, Form, Input, Modal, Select, Space, Tag, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkshopTable from '../../components/admin/WorkshopTable.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import StatusBadge from '../../components/common/StatusBadge.jsx';
 import { cancelWorkshop, getAllWorkshops } from '../../services/workshopService.js';
-import { formatDate, formatMoney } from '../../utils/formatters.js';
+import { formatDate, formatDateTime, formatMoney } from '../../utils/formatters.js';
 
 const statusOptions = [
   { value: 'OPEN', label: 'OPEN' },
@@ -28,11 +28,16 @@ export default function AdminWorkshopsPage() {
 
   const loadWorkshops = async (nextFilters = filters) => {
     setLoading(true);
-    const result = await getAllWorkshops(nextFilters);
-    const allResult = await getAllWorkshops();
-    setWorkshops(result);
-    setAllWorkshops(allResult);
-    setLoading(false);
+    try {
+      const result = await getAllWorkshops(nextFilters);
+      const allResult = await getAllWorkshops();
+      setWorkshops(result);
+      setAllWorkshops(allResult);
+    } catch (error) {
+      messageApi.error(error.message || 'Không tải được danh sách workshop.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -52,9 +57,13 @@ export default function AdminWorkshopsPage() {
   };
 
   const handleCancel = async (id) => {
-    await cancelWorkshop(id);
-    messageApi.success('Đã hủy workshop.');
-    loadWorkshops();
+    try {
+      await cancelWorkshop(id);
+      messageApi.success('Đã hủy workshop.');
+      loadWorkshops();
+    } catch (error) {
+      messageApi.error(error.message || 'Không hủy được workshop.');
+    }
   };
 
   return (
@@ -104,29 +113,43 @@ export default function AdminWorkshopsPage() {
         open={Boolean(selectedWorkshop)}
         onCancel={() => setSelectedWorkshop(null)}
         footer={null}
+        width={720}
       >
         {selectedWorkshop && (
           <Space direction="vertical" size="middle" className="full-width">
-            <StatusBadge status={selectedWorkshop.status} />
-            <h3>{selectedWorkshop.title}</h3>
+            <Space wrap>
+              <StatusBadge status={selectedWorkshop.status} />
+              <Tag color={selectedWorkshop.isPaid ? 'gold' : 'green'}>
+                {formatMoney(selectedWorkshop.price)}
+              </Tag>
+              {(selectedWorkshop.tags || []).map((tag) => (
+                <Tag key={tag}>{tag}</Tag>
+              ))}
+            </Space>
+            <h2 className="admin-modal-title">{selectedWorkshop.title}</h2>
             <p>{selectedWorkshop.description}</p>
-            <p>
-              <strong>Diễn giả:</strong> {selectedWorkshop.speakerName} -{' '}
-              {selectedWorkshop.speakerTitle}
-            </p>
-            <p>
-              <strong>Thời gian:</strong> {formatDate(selectedWorkshop.date)}{' '}
-              {selectedWorkshop.startTime}-{selectedWorkshop.endTime}
-            </p>
-            <p>
-              <strong>Phòng:</strong> {selectedWorkshop.room}
-            </p>
-            <p>
-              <strong>Giá:</strong> {formatMoney(selectedWorkshop.price)}
-            </p>
-            <p>
-              <strong>AI Summary:</strong> {selectedWorkshop.aiSummary}
-            </p>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Diễn giả">
+                {selectedWorkshop.speakerName || 'Chưa cập nhật'} - {selectedWorkshop.speakerTitle || 'N/A'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Thời gian diễn ra">
+                {formatDate(selectedWorkshop.date)} {selectedWorkshop.startTime}-{selectedWorkshop.endTime}
+              </Descriptions.Item>
+              <Descriptions.Item label="Mở đăng ký">
+                {formatDateTime(selectedWorkshop.registrationStartTime)} -{' '}
+                {formatDateTime(selectedWorkshop.registrationEndTime)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phòng">{selectedWorkshop.room}</Descriptions.Item>
+              <Descriptions.Item label="Sức chứa">
+                {selectedWorkshop.registeredCount}/{selectedWorkshop.capacity} đã đăng ký
+              </Descriptions.Item>
+              <Descriptions.Item label="Sơ đồ phòng">
+                {selectedWorkshop.roomMapText || 'Chưa cập nhật'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tóm tắt tự động">
+                {selectedWorkshop.aiSummary || 'Chưa có tóm tắt'}
+              </Descriptions.Item>
+            </Descriptions>
           </Space>
         )}
       </Modal>

@@ -1,35 +1,73 @@
 import {
   CalendarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
   EnvironmentOutlined,
+  QrcodeOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { Button, Card, Progress, Space, Tag, Typography, message } from 'antd';
+import dayjs from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import StatusBadge from '../common/StatusBadge.jsx';
-import { formatDate, formatMoney } from '../../utils/formatters.js';
+import { formatDate, formatDateTime, formatMoney } from '../../utils/formatters.js';
 import { registerWorkshop } from '../../services/registrationService.js';
 
-export default function WorkshopCard({ workshop }) {
+export default function WorkshopCard({ workshop, myRegistration, onRegistered }) {
   const navigate = useNavigate();
   const [registering, setRegistering] = useState(false);
+  const registrationId = myRegistration?.id || myRegistration?.registrationId;
+  const hasRegistered = Boolean(registrationId);
+  const pendingPayment = myRegistration?.status === 'PENDING' || myRegistration?.paymentStatus === 'PENDING';
   const remainingSeats = Math.max(workshop.capacity - workshop.registeredCount, 0);
-  const fillPercent = Math.round((workshop.registeredCount / workshop.capacity) * 100);
-  const isUnavailable = workshop.status === 'FULL' || workshop.status === 'CANCELLED';
+  const fillPercent = workshop.capacity
+    ? Math.min(100, Math.round((workshop.registeredCount / workshop.capacity) * 100))
+    : 0;
+  const registrationStart = dayjs(workshop.registrationStartTime);
+  const registrationEnd = dayjs(workshop.registrationEndTime);
+  const now = dayjs();
+  const isBeforeRegistration = registrationStart.isValid() && now.isBefore(registrationStart);
+  const isAfterRegistration = registrationEnd.isValid() && now.isAfter(registrationEnd);
+  const isUnavailable =
+    workshop.status === 'FULL' ||
+    workshop.status === 'CANCELLED' ||
+    hasRegistered ||
+    isBeforeRegistration ||
+    isAfterRegistration;
+  const registrationLabel = isBeforeRegistration
+    ? `Mở đăng ký ${formatDateTime(workshop.registrationStartTime)}`
+    : isAfterRegistration
+      ? 'Đã hết hạn đăng ký'
+      : `Đăng ký đến ${formatDateTime(workshop.registrationEndTime)}`;
+  const registrationBadge = pendingPayment ? 'PAID_PENDING' : hasRegistered ? 'REGISTERED' : null;
 
   const handleQuickRegister = async () => {
-    if (workshop.isPaid) {
-      // Redirect to detail page for paid workshops to handle payment
-      navigate(`/student/workshops/${workshop.id}`);
+    if (isUnavailable) {
       return;
     }
 
     setRegistering(true);
     try {
       const registration = await registerWorkshop(workshop.id);
-      message.success('Đăng ký workshop thành công!');
-      navigate(`/student/tickets/${registration.registrationId || registration.id}`);
+      const registrationId = registration.registrationId || registration.id;
+      onRegistered?.(workshop, registration);
+
+      if (registration.status === 'PENDING') {
+        message.info(registration.message || 'Đã giữ chỗ. Vui lòng vào Đăng ký của tôi để hoàn tất thanh toán.');
+        navigate('/student/my-registrations', {
+          state: {
+            registrationAccepted: true,
+            registrationId,
+            message: registration.message,
+          },
+        });
+        return;
+      }
+
+      message.success(registration.message || 'Đăng ký workshop thành công!');
+      navigate(`/student/tickets/${registrationId}`);
     } catch (err) {
       message.error(err.message || 'Đăng ký thất bại');
     } finally {
@@ -44,6 +82,7 @@ export default function WorkshopCard({ workshop }) {
           <Tag color="geekblue">{workshop.topic}</Tag>
           <StatusBadge status={workshop.status} />
           <StatusBadge status={workshop.isPaid ? 'PAID_EVENT' : 'FREE'} type="price" />
+          {registrationBadge && <StatusBadge status={registrationBadge} />}
         </Space>
 
         <div>
@@ -63,6 +102,9 @@ export default function WorkshopCard({ workshop }) {
           <Typography.Text>
             <EnvironmentOutlined /> {workshop.room}
           </Typography.Text>
+          <Typography.Text type="secondary">
+            <ClockCircleOutlined /> {registrationLabel}
+          </Typography.Text>
         </Space>
 
         <div className="seat-progress">
@@ -76,7 +118,7 @@ export default function WorkshopCard({ workshop }) {
         </div>
 
         <Space wrap>
-          {workshop.tags.slice(0, 3).map((tag) => (
+          {(workshop.tags || []).slice(0, 3).map((tag) => (
             <Tag key={tag}>{tag}</Tag>
           ))}
         </Space>
@@ -85,14 +127,33 @@ export default function WorkshopCard({ workshop }) {
           <Link to={`/student/workshops/${workshop.id}`}>
             <Button type="primary">Xem chi tiết</Button>
           </Link>
-          <Button 
-            disabled={isUnavailable}
-            loading={registering}
-            onClick={handleQuickRegister}
-          >
-            Đăng ký
-          </Button>
+          {hasRegistered ? (
+            <Button
+              icon={pendingPayment ? <ClockCircleOutlined /> : <QrcodeOutlined />}
+              onClick={() => navigate(`/student/tickets/${registrationId}`)}
+            >
+              {pendingPayment ? 'Thanh toán' : 'Xem vé'}
+            </Button>
+          ) : (
+            <Button
+              disabled={isUnavailable}
+              loading={registering}
+              onClick={handleQuickRegister}
+            >
+              {workshop.isPaid ? 'Giữ chỗ' : 'Đăng ký'}
+            </Button>
+          )}
         </div>
+
+        {hasRegistered && (
+          <Typography.Text
+            className={`workshop-card__registered${pendingPayment ? ' workshop-card__registered--pending' : ''}`}
+            type={pendingPayment ? 'warning' : 'success'}
+          >
+            <CheckCircleOutlined />{' '}
+            {pendingPayment ? 'Bạn đã giữ chỗ, cần hoàn tất thanh toán.' : 'Bạn đã đăng ký workshop này.'}
+          </Typography.Text>
+        )}
       </Space>
     </Card>
   );

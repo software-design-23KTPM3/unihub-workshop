@@ -3,7 +3,11 @@ import { useAuth } from '../hooks/useAuth.js';
 
 export default function RoleGuard({ allowedRoles, children }) {
   const location = useLocation();
-  const { currentUser, hasRole } = useAuth();
+  const { currentUser, hasRole, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="loading-overlay">Đang kiểm tra quyền truy cập...</div>;
+  }
 
   if (!currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;

@@ -5,7 +5,8 @@ import {
   TeamOutlined,
   TrophyOutlined,
 } from '@ant-design/icons';
-import { Card, Col, List, Progress, Row, Skeleton, Table, Typography } from 'antd';
+import { Alert, Card, Col, List, Progress, Row, Skeleton, Table, Typography } from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import AdminStatCard from '../../components/admin/AdminStatCard.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
@@ -18,20 +19,38 @@ export default function AdminDashboardPage() {
   const [workshops, setWorkshops] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     let ignore = false;
 
     async function loadDashboard() {
       setLoading(true);
-      const [workshopResult, registrationResult] = await Promise.all([
+      setLoadError(null);
+
+      const [workshopResult, registrationResult] = await Promise.allSettled([
         getAllWorkshops(),
         getAllRegistrations(),
       ]);
 
       if (!ignore) {
-        setWorkshops(workshopResult);
-        setRegistrations(registrationResult);
+        if (workshopResult.status === 'fulfilled') {
+          setWorkshops(workshopResult.value);
+        } else {
+          setWorkshops([]);
+        }
+
+        if (registrationResult.status === 'fulfilled') {
+          setRegistrations(registrationResult.value);
+        } else {
+          setRegistrations([]);
+        }
+
+        const errors = [workshopResult, registrationResult]
+          .filter((result) => result.status === 'rejected')
+          .map((result) => result.reason?.message || 'Không tải được dữ liệu dashboard.');
+
+        setLoadError(errors.length ? errors.join(' ') : null);
         setLoading(false);
       }
     }
@@ -68,8 +87,37 @@ export default function AdminDashboardPage() {
 
   const paidOrFreeRegistrations = useMemo(
     () =>
-      registrations.filter((item) => ['PAID', 'FREE'].includes(item.paymentStatus)).length,
+      registrations.filter((item) => ['SUCCESS', 'CHECKED_IN'].includes(item.status)).length,
     [registrations],
+  );
+
+  const openForRegistrationCount = useMemo(() => {
+    const now = dayjs();
+
+    return workshops.filter((workshop) => {
+      if (workshop.status !== 'OPEN') {
+        return false;
+      }
+
+      const registrationStart = dayjs(workshop.registrationStartTime);
+      const registrationEnd = dayjs(workshop.registrationEndTime);
+
+      return (
+        registrationStart.isValid() &&
+        registrationEnd.isValid() &&
+        now.isAfter(registrationStart) &&
+        now.isBefore(registrationEnd)
+      );
+    }).length;
+  }, [workshops]);
+
+  const totalRegisteredSeats = useMemo(
+    () =>
+      workshops.reduce(
+        (total, workshop) => total + Number(workshop.registeredCount || 0),
+        0,
+      ),
+    [workshops],
   );
 
   const columns = [
@@ -100,20 +148,29 @@ export default function AdminDashboardPage() {
         description="Tổng quan vận hành tuần lễ workshop UniHub."
       />
 
+      {loadError && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Một phần dữ liệu dashboard chưa tải được"
+          description={loadError}
+        />
+      )}
+
       <Row gutter={[16, 16]}>
         <Col xs={24} md={12} xl={5}>
           <AdminStatCard title="Tổng workshop" value={workshops.length} icon={<CalendarOutlined />} />
         </Col>
         <Col xs={24} md={12} xl={5}>
           <AdminStatCard
-            title="Đang mở"
-            value={workshops.filter((item) => item.status === 'OPEN').length}
+            title="Đang nhận ĐK"
+            value={openForRegistrationCount}
             icon={<FireOutlined />}
             tone="green"
           />
         </Col>
         <Col xs={24} md={12} xl={5}>
-          <AdminStatCard title="Lượt đăng ký" value={registrations.length} icon={<TeamOutlined />} />
+          <AdminStatCard title="Ghế đã giữ" value={totalRegisteredSeats} icon={<TeamOutlined />} />
         </Col>
         <Col xs={24} md={12} xl={5}>
           <AdminStatCard

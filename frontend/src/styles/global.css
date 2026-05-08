@@ -342,6 +342,19 @@ a {
   margin-top: auto;
 }
 
+.workshop-card__registered {
+  display: block;
+  padding: 8px 10px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+}
+
+.workshop-card__registered--pending {
+  background: #fffbe6;
+  border-color: #ffe58f;
+}
+
 .detail-hero-card {
   background:
     linear-gradient(120deg, rgba(22, 119, 255, 0.12), rgba(255, 255, 255, 0.94)),
@@ -372,6 +385,18 @@ a {
   grid-template-columns: 1fr auto;
   gap: 24px;
   align-items: center;
+}
+
+.ticket-card__qr {
+  display: grid;
+  width: 174px;
+  min-height: 174px;
+  place-items: center;
+  padding: 12px;
+  background: #f8fbff;
+  border: 1px dashed #b8cff0;
+  border-radius: 10px;
+  text-align: center;
 }
 
 .ticket-card__eyebrow {
@@ -507,11 +532,29 @@ a {
   box-shadow: 0 12px 30px rgba(15, 39, 71, 0.08);
 }
 
+.admin-form-alert {
+  margin-bottom: 18px;
+}
+
 .admin-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
+}
+
+.admin-form-grid--time {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-form-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-modal-title {
+  margin: 0;
+  color: #172033;
 }
 
 .metric-row {
@@ -592,6 +635,10 @@ a {
   .ticket-card__top,
   .ticket-card__details {
     grid-template-columns: 1fr;
+  }
+
+  .ticket-card__qr {
+    width: 100%;
   }
 
   .admin-filter-grid,

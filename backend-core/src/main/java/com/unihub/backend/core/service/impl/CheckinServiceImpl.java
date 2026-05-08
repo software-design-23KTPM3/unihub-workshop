@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class CheckinServiceImpl implements CheckinService {
@@ -27,16 +29,48 @@ public class CheckinServiceImpl implements CheckinService {
         log.info("Syncing {} check-in events", events.size());
         
         for (CheckinEvent event : events) {
-            registrationRepository.findAll().stream()
-                .filter(r -> r.getStudent().getMssv().equals(event.getStudentId()) && 
-                             r.getWorkshop().getId().equals(event.getWorkshopId()) &&
-                             r.getStatus() == RegistrationStatus.SUCCESS)
-                .findFirst()
-                .ifPresent(r -> {
+            findRegistration(event)
+                .filter(r -> r.getStatus() == RegistrationStatus.SUCCESS)
+                .ifPresentOrElse(r -> {
                     r.setStatus(RegistrationStatus.CHECKED_IN);
                     r.setCheckedInAt(event.getCheckinAt());
                     registrationRepository.save(r);
+                }, () -> {
+                    log.warn("Ignored check-in event {}: registration not found or not in SUCCESS status",
+                            event.getClientEventId());
                 });
+        }
+    }
+
+    private Optional<Registration> findRegistration(CheckinEvent event) {
+        if (event.getRegistrationId() != null) {
+            return registrationRepository.findById(event.getRegistrationId());
+        }
+
+        UUID registrationIdFromQr = parseUuid(event.getQrCode());
+        if (registrationIdFromQr != null) {
+            return registrationRepository.findById(registrationIdFromQr);
+        }
+
+        if (event.getQrCode() != null && !event.getQrCode().isBlank()) {
+            return registrationRepository.findByQrCode(event.getQrCode());
+        }
+
+        if (event.getStudentId() == null || event.getWorkshopId() == null) {
+            return Optional.empty();
+        }
+
+        return registrationRepository.findByStudentMssvAndWorkshopId(event.getStudentId(), event.getWorkshopId());
+    }
+
+    private UUID parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 }

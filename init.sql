@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. Tạo tất cả các ENUM TYPE trước
 CREATE TYPE workshop_status AS ENUM ('ACTIVE', 'CANCELLED');
 CREATE TYPE summary_status AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
@@ -6,6 +8,7 @@ CREATE TYPE transaction_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
 CREATE TYPE notification_type AS ENUM ('EMAIL', 'PUSH', 'IN_APP');
 CREATE TYPE notification_status AS ENUM ('PENDING', 'SENT', 'FAILED');
 CREATE TYPE sync_status AS ENUM ('SUCCESS', 'PARTIAL', 'FAILED', 'RUNNING');
+CREATE TYPE checkin_event_status AS ENUM ('ACCEPTED', 'DUPLICATE', 'INVALID');
 
 -- 2. Cấu hình CAST (Ép kiểu) để Hibernate nói chuyện được với Postgres Enum
 CREATE CAST (varchar AS workshop_status) WITH INOUT AS IMPLICIT;
@@ -15,6 +18,7 @@ CREATE CAST (varchar AS notification_type) WITH INOUT AS IMPLICIT;
 CREATE CAST (varchar AS notification_status) WITH INOUT AS IMPLICIT;
 CREATE CAST (varchar AS transaction_status) WITH INOUT AS IMPLICIT;
 CREATE CAST (varchar AS sync_status) WITH INOUT AS IMPLICIT;
+CREATE CAST (varchar AS checkin_event_status) WITH INOUT AS IMPLICIT;
 
 -- 3. Tạo các bảng
 CREATE TABLE students (
@@ -22,9 +26,10 @@ CREATE TABLE students (
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     birthday VARCHAR(20),
-    status VARCHAR(50) DEFAULT 'ACTIVE',
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_students_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
 );
 
 CREATE TABLE workshops (
@@ -36,63 +41,84 @@ CREATE TABLE workshops (
     topic VARCHAR(255),
     room VARCHAR(100),
     room_map_text TEXT,
-    tags TEXT,
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
     organizer_id VARCHAR(255),
     max_seats INTEGER NOT NULL,
     available_slots INTEGER NOT NULL,
+    registration_start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    registration_end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     is_paid BOOLEAN DEFAULT FALSE,
     price DECIMAL(12, 2) DEFAULT 0.00,
-    status workshop_status DEFAULT 'ACTIVE',
+    status workshop_status NOT NULL DEFAULT 'ACTIVE',
     summary_text TEXT,
-    summary_status summary_status DEFAULT 'PENDING',
+    summary_status summary_status NOT NULL DEFAULT 'PENDING',
     pdf_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_workshops_capacity CHECK (max_seats > 0),
+    CONSTRAINT chk_workshops_available_slots CHECK (available_slots >= 0 AND available_slots <= max_seats),
+    CONSTRAINT chk_workshops_registration_period CHECK (registration_end_time > registration_start_time),
+    CONSTRAINT chk_workshops_registration_before_start CHECK (registration_end_time <= start_time),
+    CONSTRAINT chk_workshops_time_range CHECK (end_time > start_time),
+    CONSTRAINT chk_workshops_price CHECK (price >= 0),
+    CONSTRAINT chk_workshops_paid_price CHECK ((is_paid = true AND price > 0) OR (is_paid = false AND price = 0))
 );
 
 CREATE TABLE registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id VARCHAR(20) REFERENCES students(mssv),
-    workshop_id UUID REFERENCES workshops(id),
-    status registration_status DEFAULT 'PENDING',
+    student_id VARCHAR(20) NOT NULL REFERENCES students(mssv),
+    workshop_id UUID NOT NULL REFERENCES workshops(id),
+    status registration_status NOT NULL DEFAULT 'PENDING',
     qr_code VARCHAR(255) UNIQUE,
     idempotency_key UUID UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    checked_in_at TIMESTAMP WITH TIME ZONE
+    checked_in_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT uq_registrations_student_workshop UNIQUE (student_id, workshop_id)
 );
 
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    registration_id UUID REFERENCES registrations(id),
+    registration_id UUID NOT NULL UNIQUE REFERENCES registrations(id),
     amount DECIMAL(12, 2) NOT NULL,
-    status transaction_status DEFAULT 'PENDING',
+    status transaction_status NOT NULL DEFAULT 'PENDING',
     idempotency_key UUID UNIQUE NOT NULL,
     pg_transaction_id VARCHAR(255),
+    provider VARCHAR(50) DEFAULT 'MOCK',
+    payment_url TEXT,
+    failure_reason TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    paid_at TIMESTAMP WITH TIME ZONE,
+    raw_callback JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_transactions_amount CHECK (amount >= 0)
 );
 
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id VARCHAR(20) REFERENCES students(mssv),
+    student_id VARCHAR(20) NOT NULL REFERENCES students(mssv),
+    workshop_id UUID REFERENCES workshops(id),
     type notification_type NOT NULL,
     content TEXT NOT NULL,
-    status notification_status DEFAULT 'PENDING',
+    status notification_status NOT NULL DEFAULT 'PENDING',
     error_message TEXT,
+    provider_message_id VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    workshop_id UUID,
     sent_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE sync_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    file_name VARCHAR(255),
     total_records INTEGER DEFAULT 0,
     success_count INTEGER DEFAULT 0,
     error_count INTEGER DEFAULT 0,
-    status sync_status DEFAULT 'RUNNING',
+    status sync_status NOT NULL DEFAULT 'RUNNING',
+    error_file_path TEXT,
+    message TEXT,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     finished_at TIMESTAMP WITH TIME ZONE
 );
@@ -101,9 +127,29 @@ CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     admin_id VARCHAR(255) NOT NULL,
     action VARCHAR(255) NOT NULL,
+    target_type VARCHAR(100),
     target_id VARCHAR(255),
+    old_value JSONB,
+    new_value JSONB,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     ip_address VARCHAR(45)
+);
+
+CREATE TABLE checkin_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    registration_id UUID REFERENCES registrations(id),
+    student_id VARCHAR(20) NOT NULL REFERENCES students(mssv),
+    workshop_id UUID NOT NULL REFERENCES workshops(id),
+    qr_code VARCHAR(255) NOT NULL,
+    staff_id VARCHAR(255) NOT NULL,
+    device_id VARCHAR(255),
+    scanned_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    synced_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status checkin_event_status NOT NULL DEFAULT 'ACCEPTED',
+    conflict_reason TEXT,
+    client_event_id UUID,
+    CONSTRAINT uq_checkin_events_client_event UNIQUE (client_event_id),
+    CONSTRAINT uq_checkin_events_registration_accepted UNIQUE (registration_id, status)
 );
 
 -- 4. Indices
@@ -112,13 +158,9 @@ CREATE INDEX idx_registrations_workshop ON registrations(workshop_id);
 CREATE INDEX idx_workshops_status ON workshops(status);
 CREATE INDEX idx_workshops_organizer ON workshops(organizer_id);
 CREATE INDEX idx_notifications_status ON notifications(status);
-
--- 5. Seed Data
-INSERT INTO workshops (id, name, description, speaker, speaker_title, room, max_seats, available_slots, start_time, end_time, is_paid, price, status) VALUES 
-('11111111-1111-1111-1111-111111111111', 'Spring Boot Microservices', 'Học về kiến trúc Microservices với Spring Boot và Docker', 'John Doe', 'Senior Engineer', 'A101', 50, 50, CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '1 day 2 hours', false, 0, 'ACTIVE'),
-('22222222-2222-2222-2222-222222222222', 'Advanced AI in Practice', 'Ứng dụng AI thực tế vào quy trình phát triển phần mềm', 'Jane Smith', 'AI Specialist', 'B202', 30, 30, CURRENT_TIMESTAMP + INTERVAL '2 days', CURRENT_TIMESTAMP + INTERVAL '2 days 3 hours', true, 100000, 'ACTIVE'),
-('33333333-3333-3333-3333-333333333333', 'Web Frontend Performance', 'Tối ưu hóa hiệu năng website với React và Vite', 'Trần Văn B', 'Frontend Lead', 'C303', 100, 100, CURRENT_TIMESTAMP + INTERVAL '3 days', CURRENT_TIMESTAMP + INTERVAL '3 days 2 hours', false, 0, 'ACTIVE'),
-('44444444-4444-4444-4444-444444444444', 'Data Science với Python', 'Phân tích dữ liệu thực tế với Pandas và Scikit-learn', 'Lê Thị C', 'Data Scientist', 'D404', 40, 40, CURRENT_TIMESTAMP + INTERVAL '4 days', CURRENT_TIMESTAMP + INTERVAL '4 days 3 hours', true, 150000, 'ACTIVE'),
-('55555555-5555-5555-5555-555555555555', 'Kỹ năng Phỏng vấn IT', 'Bí quyết chinh phục các nhà tuyển dụng công nghệ lớn', 'Nguyễn Văn D', 'HR Manager', 'E505', 60, 60, CURRENT_TIMESTAMP + INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '5 days 1 hour', false, 0, 'ACTIVE'),
-('66666666-6666-6666-6666-666666666666', 'Cloud Computing cơ bản', 'Làm quen với AWS, Azure và Google Cloud', 'Phạm Minh E', 'Cloud Architect', 'F606', 45, 45, CURRENT_TIMESTAMP + INTERVAL '6 days', CURRENT_TIMESTAMP + INTERVAL '6 days 2 hours', false, 0, 'ACTIVE'),
-('77777777-7777-7777-7777-777777777777', 'Cyber Security fundamentals', 'Bảo mật ứng dụng và phòng chống tấn công mạng', 'Hoàng Gia F', 'Security Analyst', 'G707', 35, 35, CURRENT_TIMESTAMP + INTERVAL '7 days', CURRENT_TIMESTAMP + INTERVAL '7 days 3 hours', true, 200000, 'ACTIVE');
+CREATE INDEX idx_notifications_student ON notifications(student_id);
+CREATE INDEX idx_transactions_status ON transactions(status);
+CREATE INDEX idx_checkin_events_workshop ON checkin_events(workshop_id);
+CREATE INDEX idx_checkin_events_student ON checkin_events(student_id);
+CREATE INDEX idx_checkin_events_status ON checkin_events(status);
+CREATE INDEX idx_workshops_tags ON workshops USING GIN (tags);

@@ -1,11 +1,13 @@
 import dayjs from 'dayjs';
 
 export function formatDate(date) {
-  return dayjs(date).format('DD/MM/YYYY');
+  const value = dayjs(date);
+  return value.isValid() ? value.format('DD/MM/YYYY') : '--';
 }
 
 export function formatDateTime(value) {
-  return dayjs(value).format('DD/MM/YYYY HH:mm');
+  const date = dayjs(value);
+  return date.isValid() ? date.format('DD/MM/YYYY HH:mm') : '--';
 }
 
 export function formatMoney(value) {

@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../config/api.js';
+import { oidcConfig } from '../config/oidc.js';
 
-function buildUrl(endpoint, query) {
+export function buildUrl(endpoint, query) {
   const normalizedBaseUrl = API_BASE_URL.replace(/\/$/, '');
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = new URL(`${normalizedBaseUrl}${normalizedEndpoint}`);
@@ -14,10 +15,10 @@ function buildUrl(endpoint, query) {
   return url.toString();
 }
 
-function getAuthToken() {
-  const key = 'oidc.user:http://localhost:8080/realms/unihub:unihub-client';
+export function getAuthToken() {
+  const key = `oidc.user:${oidcConfig.authority}:${oidcConfig.client_id}`;
   const oidcStorage = sessionStorage.getItem(key) || localStorage.getItem(key);
-  
+
   if (oidcStorage) {
     try {
       const user = JSON.parse(oidcStorage);
@@ -26,7 +27,20 @@ function getAuthToken() {
       console.error('Failed to parse OIDC user from storage', e);
     }
   }
-  
+
+  const fallbackKey = Object.keys(sessionStorage)
+    .concat(Object.keys(localStorage))
+    .find((storageKey) => storageKey.startsWith('oidc.user:') && storageKey.endsWith(`:${oidcConfig.client_id}`));
+
+  if (fallbackKey) {
+    try {
+      const user = JSON.parse(sessionStorage.getItem(fallbackKey) || localStorage.getItem(fallbackKey));
+      return user?.access_token || null;
+    } catch (e) {
+      console.error('Failed to parse fallback OIDC user from storage', e);
+    }
+  }
+
   return null;
 }
 
@@ -68,10 +82,41 @@ async function request(endpoint, options = {}) {
         ? data.message || data.error || `HTTP ${response.status}`
         : data || `HTTP ${response.status}`;
 
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
+}
+
+async function requestBlob(endpoint, options = {}) {
+  const { query, headers = {}, signal } = options;
+  const token = getAuthToken();
+
+  const response = await fetch(buildUrl(endpoint, query), {
+    method: 'GET',
+    signal,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await parseResponse(response);
+    const message =
+      typeof data === 'object' && data
+        ? data.message || data.error || `HTTP ${response.status}`
+        : data || `HTTP ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return response.blob();
 }
 
 export const httpClient = {
@@ -89,5 +134,8 @@ export const httpClient = {
   },
   delete(endpoint, options) {
     return request(endpoint, { ...options, method: 'DELETE' });
+  },
+  blob(endpoint, options) {
+    return requestBlob(endpoint, options);
   },
 };

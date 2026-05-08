@@ -3,6 +3,13 @@ import { useAuth } from 'react-oidc-context';
 
 export const AuthContext = createContext(null);
 
+function parseJwtPayload(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=');
+  return JSON.parse(atob(padded));
+}
+
 export function AuthProviderWrapper({ children }) {
   const auth = useAuth();
 
@@ -19,8 +26,9 @@ export function AuthProviderWrapper({ children }) {
 
     const token = auth.user.access_token;
     let roles = [];
+    let payload = {};
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      payload = parseJwtPayload(token);
       roles = payload.realm_access?.roles || [];
     } catch (e) {
       console.error("Failed to parse token payload", e);
@@ -30,7 +38,7 @@ export function AuthProviderWrapper({ children }) {
     return {
       ...profile,
       id: profile.sub,
-      studentId: profile.preferred_username, // MSSV is stored here in Keycloak
+      studentId: payload.studentId || profile.studentId || profile.preferred_username,
       email: profile.email,
       name: profile.name || profile.preferred_username,
       roles: roles,

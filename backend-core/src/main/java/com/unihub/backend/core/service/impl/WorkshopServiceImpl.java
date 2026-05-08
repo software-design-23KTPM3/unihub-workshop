@@ -7,8 +7,10 @@ import com.unihub.backend.core.exception.WorkshopNotFoundException;
 import com.unihub.backend.core.model.dto.WorkshopRequest;
 import com.unihub.backend.core.model.dto.WorkshopResponse;
 import com.unihub.backend.core.model.entity.Workshop;
+import com.unihub.backend.core.model.enums.RegistrationStatus;
 import com.unihub.backend.core.model.enums.SummaryStatus;
 import com.unihub.backend.core.model.enums.WorkshopStatus;
+import com.unihub.backend.core.repository.RegistrationRepository;
 import com.unihub.backend.core.repository.WorkshopRepository;
 import com.unihub.backend.core.service.FileStorageService;
 import com.unihub.backend.core.service.WorkshopService;
@@ -22,11 +24,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -42,20 +44,28 @@ public class WorkshopServiceImpl implements WorkshopService {
 
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Bangkok");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final List<RegistrationStatus> OCCUPIED_REGISTRATION_STATUSES = List.of(
+            RegistrationStatus.PENDING,
+            RegistrationStatus.SUCCESS,
+            RegistrationStatus.CHECKED_IN);
     private static final String WORKSHOP_LIST_CACHE = "workshop_list";
     private static final String WORKSHOP_DETAILS_CACHE_PREFIX = "workshop_details:";
     private static final String WORKSHOP_SLOTS_PREFIX = "workshop_slots:";
+    private static final String WORKSHOP_META_PREFIX = "workshop_meta:";
 
     private final WorkshopRepository workshopRepository;
+    private final RegistrationRepository registrationRepository;
     private final StringRedisTemplate redisTemplate;
     private final RabbitTemplate rabbitTemplate;
     private final FileStorageService fileStorageService;
 
     public WorkshopServiceImpl(WorkshopRepository workshopRepository,
+            RegistrationRepository registrationRepository,
             StringRedisTemplate redisTemplate,
             RabbitTemplate rabbitTemplate,
             FileStorageService fileStorageService) {
         this.workshopRepository = workshopRepository;
+        this.registrationRepository = registrationRepository;
         this.redisTemplate = redisTemplate;
         this.rabbitTemplate = rabbitTemplate;
         this.fileStorageService = fileStorageService;
@@ -75,15 +85,14 @@ public class WorkshopServiceImpl implements WorkshopService {
                 redisTemplate.opsForValue().set(key, String.valueOf(workshop.getAvailableSlots()));
                 log.info("Initialized Workshop {} slots: {}", workshop.getId(), workshop.getAvailableSlots());
             }
+            syncWorkshopMetaToRedis(workshop);
         });
         log.info("Workshop Slots synchronization COMPLETED.");
     }
 
     @Override
     public List<WorkshopResponse> getAllWorkshops(Authentication authentication, Map<String, String> filters) {
-        List<Workshop> workshops = isOrganizer(authentication) && !isAdmin(authentication)
-                ? workshopRepository.findByOrganizerId(currentUserId(authentication))
-                : workshopRepository.findAll();
+        List<Workshop> workshops = workshopRepository.findAll();
 
         return workshops.stream()
                 .map(this::mapToResponse)
@@ -109,14 +118,16 @@ public class WorkshopServiceImpl implements WorkshopService {
                 .topic(request.getTopic())
                 .room(request.getRoom())
                 .roomMapText(request.getRoomMapText())
-                .tags(serializeTags(request.getTags()))
+                .tags(normalizeTags(request.getTags()))
                 .organizerId(currentUserId(authentication))
                 .maxSeats(request.getCapacity())
                 .availableSlots(request.getCapacity())
+                .registrationStartTime(toRegistrationStartZonedDateTime(request))
+                .registrationEndTime(toRegistrationEndZonedDateTime(request))
                 .startTime(toZonedDateTime(request))
                 .endTime(toEndZonedDateTime(request))
                 .isPaid(Boolean.TRUE.equals(request.getIsPaid()))
-                .price(request.getPrice())
+                .price(normalizePrice(request))
                 .status(WorkshopStatus.ACTIVE)
                 .summaryStatus(SummaryStatus.PENDING)
                 .build();
@@ -128,9 +139,8 @@ public class WorkshopServiceImpl implements WorkshopService {
             handlePdfUpload(workshop, file);
         }
 
-        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(),
-                String.valueOf(workshop.getAvailableSlots()));
-        rabbitTemplate.convertAndSend("workshop.exchange", "workshop.created", workshop.getId().toString());
+        syncWorkshopAdmissionToRedisAfterCommit(workshop);
+        publishWorkshopCreatedAfterCommit(workshop.getId());
         invalidateCache(workshop.getId());
 
         return mapToResponse(workshop);
@@ -146,10 +156,11 @@ public class WorkshopServiceImpl implements WorkshopService {
         ensureCanManage(workshop, authentication);
         ensureMutable(workshop);
 
-        int registeredCount = getRegisteredCount(workshop);
+        int registeredCount = getOccupiedRegistrationCount(workshop.getId());
         if (request.getCapacity() < registeredCount) {
             throw new InvalidWorkshopException("Capacity cannot be less than registered students");
         }
+        int capacityDelta = request.getCapacity() - workshop.getMaxSeats();
 
         workshop.setName(request.getTitle().trim());
         workshop.setDescription(request.getDescription());
@@ -158,13 +169,15 @@ public class WorkshopServiceImpl implements WorkshopService {
         workshop.setTopic(request.getTopic());
         workshop.setRoom(request.getRoom());
         workshop.setRoomMapText(request.getRoomMapText());
-        workshop.setTags(serializeTags(request.getTags()));
+        workshop.setTags(normalizeTags(request.getTags()));
         workshop.setMaxSeats(request.getCapacity());
         workshop.setAvailableSlots(request.getCapacity() - registeredCount);
+        workshop.setRegistrationStartTime(toRegistrationStartZonedDateTime(request));
+        workshop.setRegistrationEndTime(toRegistrationEndZonedDateTime(request));
         workshop.setStartTime(toZonedDateTime(request));
         workshop.setEndTime(toEndZonedDateTime(request));
         workshop.setIsPaid(Boolean.TRUE.equals(request.getIsPaid()));
-        workshop.setPrice(request.getPrice());
+        workshop.setPrice(normalizePrice(request));
         workshop.setSummaryText(request.getAiSummary());
 
         if (file != null && !file.isEmpty()) {
@@ -172,8 +185,8 @@ public class WorkshopServiceImpl implements WorkshopService {
         }
 
         workshop = workshopRepository.save(workshop);
-        redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + workshop.getId(),
-                String.valueOf(workshop.getAvailableSlots()));
+        updateRedisSlotsForCapacityChange(workshop, capacityDelta);
+        syncWorkshopMetaToRedisAfterCommit(workshop);
         invalidateCache(workshop.getId());
 
         return mapToResponse(workshop);
@@ -191,6 +204,7 @@ public class WorkshopServiceImpl implements WorkshopService {
         workshop = workshopRepository.save(workshop);
 
         redisTemplate.delete(WORKSHOP_SLOTS_PREFIX + id);
+        redisTemplate.delete(WORKSHOP_META_PREFIX + id);
         invalidateCache(id);
 
         return mapToResponse(workshop);
@@ -231,12 +245,20 @@ public class WorkshopServiceImpl implements WorkshopService {
         if (request.getCapacity() == null || request.getCapacity() <= 0) {
             throw new InvalidWorkshopException("Capacity must be greater than 0");
         }
+        validatePrice(request);
         if (request.getStartTime() == null || request.getEndTime() == null
                 || !request.getStartTime().isBefore(request.getEndTime())) {
             throw new InvalidWorkshopException("Start time must be before end time");
         }
         if (request.getDate() == null) {
             throw new InvalidWorkshopException("Date is required");
+        }
+        if (request.getRegistrationStartTime() == null || request.getRegistrationEndTime() == null
+                || !request.getRegistrationStartTime().isBefore(request.getRegistrationEndTime())) {
+            throw new InvalidWorkshopException("Registration start time must be before registration end time");
+        }
+        if (toRegistrationEndZonedDateTime(request).isAfter(toZonedDateTime(request))) {
+            throw new InvalidWorkshopException("Registration end time must be before or equal to workshop start time");
         }
     }
 
@@ -247,12 +269,27 @@ public class WorkshopServiceImpl implements WorkshopService {
     }
 
     private void ensureCanManage(Workshop workshop, Authentication authentication) {
-        if (isAdmin(authentication)) {
+        if (isAdmin(authentication) || isOrganizer(authentication)) {
             return;
         }
-        if (!isOrganizer(authentication) || !Objects.equals(workshop.getOrganizerId(), currentUserId(authentication))) {
-            throw new WorkshopAccessDeniedException();
+        throw new WorkshopAccessDeniedException();
+    }
+
+    private void validatePrice(WorkshopRequest request) {
+        BigDecimal price = request.getPrice() == null ? BigDecimal.ZERO : request.getPrice();
+        if (price.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidWorkshopException("Price must not be negative");
         }
+        if (Boolean.TRUE.equals(request.getIsPaid()) && price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidWorkshopException("Paid workshops must have a price greater than 0");
+        }
+    }
+
+    private BigDecimal normalizePrice(WorkshopRequest request) {
+        if (!Boolean.TRUE.equals(request.getIsPaid())) {
+            return BigDecimal.ZERO;
+        }
+        return request.getPrice();
     }
 
     private boolean isAdmin(Authentication authentication) {
@@ -284,16 +321,78 @@ public class WorkshopServiceImpl implements WorkshopService {
         return ZonedDateTime.of(LocalDateTime.of(request.getDate(), request.getEndTime()), APP_ZONE);
     }
 
+    private ZonedDateTime toRegistrationStartZonedDateTime(WorkshopRequest request) {
+        return ZonedDateTime.of(request.getRegistrationStartTime(), APP_ZONE);
+    }
+
+    private ZonedDateTime toRegistrationEndZonedDateTime(WorkshopRequest request) {
+        return ZonedDateTime.of(request.getRegistrationEndTime(), APP_ZONE);
+    }
+
     private void invalidateCache(UUID id) {
         redisTemplate.delete(WORKSHOP_LIST_CACHE);
         redisTemplate.delete(WORKSHOP_DETAILS_CACHE_PREFIX + id);
     }
 
+    private void publishWorkshopCreatedAfterCommit(UUID id) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                rabbitTemplate.convertAndSend("workshop.exchange", "workshop.created", id.toString());
+            }
+        });
+    }
+
+    private void syncWorkshopAdmissionToRedisAfterCommit(Workshop workshop) {
+        UUID id = workshop.getId();
+        Integer availableSlots = workshop.getAvailableSlots();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                redisTemplate.opsForValue().set(WORKSHOP_SLOTS_PREFIX + id, String.valueOf(availableSlots));
+                syncWorkshopMetaToRedis(workshop);
+            }
+        });
+    }
+
+    private void syncWorkshopMetaToRedisAfterCommit(Workshop workshop) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                syncWorkshopMetaToRedis(workshop);
+            }
+        });
+    }
+
+    private void syncWorkshopMetaToRedis(Workshop workshop) {
+        String metaKey = WORKSHOP_META_PREFIX + workshop.getId();
+        redisTemplate.opsForHash().put(metaKey, "status", workshop.getStatus().name());
+        redisTemplate.opsForHash().put(metaKey, "registration_start_epoch",
+                String.valueOf(workshop.getRegistrationStartTime().toInstant().getEpochSecond()));
+        redisTemplate.opsForHash().put(metaKey, "registration_end_epoch",
+                String.valueOf(workshop.getRegistrationEndTime().toInstant().getEpochSecond()));
+    }
+
+    private void updateRedisSlotsForCapacityChange(Workshop workshop, int capacityDelta) {
+        String slotKey = WORKSHOP_SLOTS_PREFIX + workshop.getId();
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(slotKey))) {
+            redisTemplate.opsForValue().increment(slotKey, capacityDelta);
+            return;
+        }
+        redisTemplate.opsForValue().set(slotKey, String.valueOf(workshop.getAvailableSlots()));
+    }
+
     private int getRegisteredCount(Workshop workshop) {
-        if (workshop.getMaxSeats() == null || workshop.getAvailableSlots() == null) {
+        if (workshop.getId() == null) {
             return 0;
         }
-        return Math.max(workshop.getMaxSeats() - workshop.getAvailableSlots(), 0);
+        return getOccupiedRegistrationCount(workshop.getId());
+    }
+
+    private int getOccupiedRegistrationCount(UUID workshopId) {
+        return Math.toIntExact(registrationRepository.countByWorkshopIdAndStatusIn(
+                workshopId,
+                OCCUPIED_REGISTRATION_STATUSES));
     }
 
     private String toContractStatus(Workshop workshop) {
@@ -303,22 +402,12 @@ public class WorkshopServiceImpl implements WorkshopService {
         return getRegisteredCount(workshop) >= workshop.getMaxSeats() ? "FULL" : "OPEN";
     }
 
-    private String serializeTags(List<String> tags) {
+    private List<String> normalizeTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
         return tags.stream()
                 .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(tag -> !tag.isEmpty())
-                .collect(Collectors.joining(","));
-    }
-
-    private List<String> deserializeTags(String tags) {
-        if (tags == null || tags.isBlank()) {
-            return Collections.emptyList();
-        }
-        return Arrays.stream(tags.split(","))
                 .map(String::trim)
                 .filter(tag -> !tag.isEmpty())
                 .collect(Collectors.toList());
@@ -380,6 +469,8 @@ public class WorkshopServiceImpl implements WorkshopService {
     private WorkshopResponse mapToResponse(Workshop workshop) {
         ZonedDateTime startTime = workshop.getStartTime().withZoneSameInstant(APP_ZONE);
         ZonedDateTime endTime = workshop.getEndTime().withZoneSameInstant(APP_ZONE);
+        ZonedDateTime registrationStartTime = workshop.getRegistrationStartTime().withZoneSameInstant(APP_ZONE);
+        ZonedDateTime registrationEndTime = workshop.getRegistrationEndTime().withZoneSameInstant(APP_ZONE);
 
         return WorkshopResponse.builder()
                 .id(workshop.getId())
@@ -394,12 +485,14 @@ public class WorkshopServiceImpl implements WorkshopService {
                 .date(startTime.toLocalDate().toString())
                 .startTime(startTime.toLocalTime().format(TIME_FORMATTER))
                 .endTime(endTime.toLocalTime().format(TIME_FORMATTER))
+                .registrationStartTime(registrationStartTime.toLocalDateTime().toString())
+                .registrationEndTime(registrationEndTime.toLocalDateTime().toString())
                 .capacity(workshop.getMaxSeats())
                 .registeredCount(getRegisteredCount(workshop))
                 .price(workshop.getPrice())
                 .isPaid(workshop.getIsPaid())
                 .status(toContractStatus(workshop))
-                .tags(deserializeTags(workshop.getTags()))
+                .tags(workshop.getTags() == null ? Collections.emptyList() : workshop.getTags())
                 .aiSummary(workshop.getSummaryText())
                 .organizerId(workshop.getOrganizerId())
                 .build();

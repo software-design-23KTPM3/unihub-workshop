@@ -5,6 +5,7 @@ import com.unihub.backend.core.model.dto.RegistrationResponse;
 import com.unihub.backend.core.service.RegistrationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -21,9 +22,11 @@ public class RegistrationController {
 
     @PostMapping("/registrations")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('STUDENT')")
     public RegistrationResponse createRegistration(
-            @Valid @RequestBody RegistrationRequest request) {
-        return registrationService.createRegistration(request);
+            @Valid @RequestBody RegistrationRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        return registrationService.createRegistration(request, authentication);
     }
 
     @GetMapping("/me/registrations")
@@ -42,6 +45,13 @@ public class RegistrationController {
     @GetMapping("/registrations/{id}")
     public com.unihub.backend.core.model.dto.RegistrationDetailResponse getRegistrationById(@PathVariable UUID id) {
         return registrationService.getRegistrationById(id);
+    }
+
+    @GetMapping(value = "/registrations/{id}/qr.png", produces = MediaType.IMAGE_PNG_VALUE)
+    public byte[] getRegistrationQrImage(
+            @PathVariable UUID id,
+            org.springframework.security.core.Authentication authentication) {
+        return registrationService.getRegistrationQrPng(id, authentication);
     }
 
     @PostMapping("/registrations/{id}/payment/mock-success")

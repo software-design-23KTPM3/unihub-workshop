@@ -16,6 +16,8 @@ export default function AdminWorkshopCreatePage() {
       await createWorkshop(payload);
       messageApi.success('Tạo workshop thành công.');
       navigate('/admin/workshops');
+    } catch (error) {
+      messageApi.error(error.message || 'Không tạo được workshop.');
     } finally {
       setSubmitting(false);
     }

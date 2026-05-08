@@ -7,7 +7,8 @@ export const API_ENDPOINTS = {
     create: '/registrations',
     mine: '/me/registrations',
     detail: (id) => `/registrations/${id}`,
-    mockPaymentSuccess: (id) => `/registrations/${id}/payment/mock-success`,
+    qrImage: (id) => `/registrations/${id}/qr.png`,
+    startPayment: (id) => `/registrations/${id}/payment/start`,
   },
   admin: {
     workshops: {

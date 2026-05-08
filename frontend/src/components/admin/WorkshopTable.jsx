@@ -1,8 +1,8 @@
 import { EyeOutlined, StopOutlined } from '@ant-design/icons';
-import { Button, Popconfirm, Space, Table } from 'antd';
+import { Button, Popconfirm, Space, Table, Tag, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge.jsx';
-import { formatDate, formatMoney } from '../../utils/formatters.js';
+import { formatDate, formatDateTime, formatMoney } from '../../utils/formatters.js';
 
 export default function WorkshopTable({ workshops, loading, onView, onCancel }) {
   const columns = [
@@ -11,6 +11,12 @@ export default function WorkshopTable({ workshops, loading, onView, onCancel }) 
       dataIndex: 'title',
       key: 'title',
       width: 260,
+      render: (title, record) => (
+        <Space direction="vertical" size={2}>
+          <Typography.Text strong>{title}</Typography.Text>
+          <Typography.Text type="secondary">{record.topic || 'Chưa phân loại'}</Typography.Text>
+        </Space>
+      ),
     },
     {
       title: 'Ngày/giờ',
@@ -26,10 +32,23 @@ export default function WorkshopTable({ workshops, loading, onView, onCancel }) 
       render: (_, record) => Math.max(record.capacity - record.registeredCount, 0),
     },
     {
+      title: 'Mở đăng ký',
+      key: 'registrationWindow',
+      width: 240,
+      render: (_, record) => (
+        <Space direction="vertical" size={2}>
+          <Typography.Text>{formatDateTime(record.registrationStartTime)}</Typography.Text>
+          <Typography.Text type="secondary">đến {formatDateTime(record.registrationEndTime)}</Typography.Text>
+        </Space>
+      ),
+    },
+    {
       title: 'Giá',
       dataIndex: 'price',
       key: 'price',
-      render: (price) => formatMoney(price),
+      render: (price, record) => (
+        <Tag color={record.isPaid ? 'gold' : 'green'}>{formatMoney(price)}</Tag>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -43,9 +62,7 @@ export default function WorkshopTable({ workshops, loading, onView, onCancel }) 
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button icon={<EyeOutlined />} onClick={() => onView(record)}>
-            Xem
-          </Button>
+          <Button icon={<EyeOutlined />} onClick={() => onView(record)} />
           <Link to={`/admin/workshops/${record.id}/edit`}>
             <Button>Sửa</Button>
           </Link>
@@ -57,9 +74,7 @@ export default function WorkshopTable({ workshops, loading, onView, onCancel }) 
             onConfirm={() => onCancel(record.id)}
             disabled={record.status === 'CANCELLED'}
           >
-            <Button danger icon={<StopOutlined />} disabled={record.status === 'CANCELLED'}>
-              Hủy
-            </Button>
+            <Button danger icon={<StopOutlined />} disabled={record.status === 'CANCELLED'} />
           </Popconfirm>
         </Space>
       ),
@@ -72,7 +87,7 @@ export default function WorkshopTable({ workshops, loading, onView, onCancel }) 
       columns={columns}
       dataSource={workshops}
       loading={loading}
-      scroll={{ x: 1200 }}
+      scroll={{ x: 1400 }}
       pagination={{ pageSize: 8 }}
     />
   );

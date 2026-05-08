@@ -17,6 +17,8 @@ public class WorkshopResponse {
     private String date;
     private String startTime;
     private String endTime;
+    private String registrationStartTime;
+    private String registrationEndTime;
     private Integer capacity;
     private Integer registeredCount;
     private BigDecimal price;
@@ -50,6 +52,10 @@ public class WorkshopResponse {
     public void setStartTime(String startTime) { this.startTime = startTime; }
     public String getEndTime() { return endTime; }
     public void setEndTime(String endTime) { this.endTime = endTime; }
+    public String getRegistrationStartTime() { return registrationStartTime; }
+    public void setRegistrationStartTime(String registrationStartTime) { this.registrationStartTime = registrationStartTime; }
+    public String getRegistrationEndTime() { return registrationEndTime; }
+    public void setRegistrationEndTime(String registrationEndTime) { this.registrationEndTime = registrationEndTime; }
     public Integer getCapacity() { return capacity; }
     public void setCapacity(Integer capacity) { this.capacity = capacity; }
     public Integer getRegisteredCount() { return registeredCount; }
@@ -83,6 +89,8 @@ public class WorkshopResponse {
         public WorkshopResponseBuilder date(String date) { r.date = date; return this; }
         public WorkshopResponseBuilder startTime(String startTime) { r.startTime = startTime; return this; }
         public WorkshopResponseBuilder endTime(String endTime) { r.endTime = endTime; return this; }
+        public WorkshopResponseBuilder registrationStartTime(String registrationStartTime) { r.registrationStartTime = registrationStartTime; return this; }
+        public WorkshopResponseBuilder registrationEndTime(String registrationEndTime) { r.registrationEndTime = registrationEndTime; return this; }
         public WorkshopResponseBuilder capacity(Integer capacity) { r.capacity = capacity; return this; }
         public WorkshopResponseBuilder registeredCount(Integer registeredCount) { r.registeredCount = registeredCount; return this; }
         public WorkshopResponseBuilder price(BigDecimal price) { r.price = price; return this; }

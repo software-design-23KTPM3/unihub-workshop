@@ -21,7 +21,6 @@ Theo `package.json`, frontend đang dùng:
 - Ant Design
 - `@ant-design/icons`
 - `dayjs`
-- `qrcode.react`
 - Native `fetch` thông qua wrapper `src/services/httpClient.js`
 
 ## 3. Cấu Trúc Thư Mục Frontend

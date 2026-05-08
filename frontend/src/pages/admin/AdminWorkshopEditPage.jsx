@@ -48,6 +48,8 @@ export default function AdminWorkshopEditPage() {
       await updateWorkshop(id, payload);
       messageApi.success('Cập nhật workshop thành công.');
       navigate('/admin/workshops');
+    } catch (error) {
+      messageApi.error(error.message || 'Không cập nhật được workshop.');
     } finally {
       setSubmitting(false);
     }

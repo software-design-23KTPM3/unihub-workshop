@@ -1,7 +1,6 @@
 import { CalendarOutlined, EnvironmentOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Row, Space, Statistic, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { QRCodeCanvas } from 'qrcode.react';
 import PageHeader from '../../components/common/PageHeader.jsx';
 
 export default function StudentHomePage() {
@@ -60,7 +59,7 @@ export default function StudentHomePage() {
             </Space>
           </Space>
           <div className="ticket-preview">
-            <QRCodeCanvas value="UNIHUB-DEMO-TICKET-2312345" size={88} />
+            <QrcodeOutlined aria-hidden />
           </div>
         </Space>
       </Card>

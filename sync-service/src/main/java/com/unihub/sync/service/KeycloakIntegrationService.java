@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -42,6 +43,7 @@ public class KeycloakIntegrationService {
         user.setEmail(email);
         user.setFirstName(name);
         user.setEnabled(true);
+        user.setAttributes(Map.of("studentId", List.of(username)));
 
         CredentialRepresentation credential = new CredentialRepresentation();
         credential.setType(CredentialRepresentation.PASSWORD);
@@ -73,6 +75,7 @@ public class KeycloakIntegrationService {
         UserRepresentation user = usersResource.get(userId).toRepresentation();
         user.setEmail(email);
         user.setFirstName(name);
+        user.setAttributes(Map.of("studentId", List.of(user.getUsername())));
         usersResource.get(userId).update(user);
         log.info("Successfully updated Keycloak user: {}", user.getUsername());
     }
