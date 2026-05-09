@@ -27,6 +27,7 @@
         android:padding="12dp"
         android:textSize="16sp"
         android:background="@drawable/bg_edit_text_custom"
+        android:maxLines="1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tvInput" />

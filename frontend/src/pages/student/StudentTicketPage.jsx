@@ -13,21 +13,22 @@ export default function StudentTicketPage() {
   const { currentUser } = useAuth();
   const [registration, setRegistration] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [paymentError, setPaymentError] = useState('');
   const [paying, setPaying] = useState(false);
 
   const handleStartPayment = async () => {
     setPaying(true);
-    setError('');
+    setPaymentError('');
     try {
       const payment = await startRegistrationPayment(registrationId);
       if (payment.paymentUrl) {
         window.location.href = payment.paymentUrl;
         return;
       }
-      setError(payment.message || 'Chưa thể mở trang thanh toán. Vui lòng thử lại sau.');
+      setPaymentError(payment.message || 'Chưa thể mở trang thanh toán. Vui lòng thử lại sau.');
     } catch (err) {
-      setError(err.message || 'Dịch vụ thanh toán đang tạm gián đoạn. Vui lòng thử lại sau.');
+      setPaymentError(err.message || 'Dịch vụ thanh toán đang tạm gián đoạn. Vui lòng thử lại sau.');
     } finally {
       setPaying(false);
     }
@@ -38,7 +39,7 @@ export default function StudentTicketPage() {
 
     async function loadTicket() {
       setLoading(true);
-      setError('');
+      setLoadError('');
 
       let retries = 0;
       const maxRetries = 5;
@@ -55,7 +56,7 @@ export default function StudentTicketPage() {
             retries++;
             setTimeout(attemptLoad, 1000); // Retry after 1s
           } else if (!ignore) {
-            setError(loadError.message);
+            setLoadError(loadError.message);
             setLoading(false);
           }
         }
@@ -75,11 +76,11 @@ export default function StudentTicketPage() {
     return <LoadingState rows={10} />;
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <ErrorState
         title="Không tìm thấy ticket"
-        message={error}
+        message={loadError}
         actionTo="/student/my-registrations"
         actionText="Về đăng ký của tôi"
       />
@@ -117,6 +118,16 @@ export default function StudentTicketPage() {
           type="success"
           showIcon
           message="Vé hợp lệ. Mã QR đã sẵn sàng trên vé của bạn."
+        />
+      )}
+      {paymentError && (
+        <Alert
+          type="error"
+          showIcon
+          closable
+          message="Thanh toán thất bại"
+          description={paymentError}
+          onClose={() => setPaymentError('')}
         />
       )}
       <TicketCard registration={registration} currentUser={currentUser} />

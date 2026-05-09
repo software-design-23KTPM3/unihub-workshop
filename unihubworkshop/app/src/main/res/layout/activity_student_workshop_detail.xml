@@ -58,6 +58,16 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/lblSummary" />
 
+            <TextView
+                android:id="@+id/tvRoomMapText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:paddingBottom="12dp"
+                android:textColor="#666666"
+                android:textSize="14sp"
+                app:layout_constraintTop_toBottomOf="@id/tvSummaryContent" />
+
             <!-- Details Seating Map -->
             <ImageView
                 android:id="@+id/ivSeatingMap"
@@ -66,7 +76,7 @@
                 android:adjustViewBounds="true"
                 android:scaleType="fitCenter"
                 android:src="@drawable/img_seating_map"
-                app:layout_constraintTop_toBottomOf="@id/tvSummaryContent"
+                app:layout_constraintTop_toBottomOf="@id/tvRoomMapText"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"/>
 

@@ -1,6 +1,8 @@
 package com.unihub.payment.service;
 
 import com.unihub.payment.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -17,22 +19,30 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class PaymentSandboxService {
+    private static final Logger log = LoggerFactory.getLogger(PaymentSandboxService.class);
 
     private final Map<String, SandboxPayment> paymentsById = new ConcurrentHashMap<>();
     private final Map<UUID, String> paymentIdByIdempotencyKey = new ConcurrentHashMap<>();
     private final RestClient restClient = RestClient.create();
     private final String publicBaseUrl;
     private final String webhookSecret;
+    private final String failureCallbackUrls;
     private volatile GatewayMode mode = GatewayMode.NORMAL;
 
     public PaymentSandboxService(
             @Value("${app.payment.public-base-url:http://localhost/sandbox}") String publicBaseUrl,
-            @Value("${app.payment.webhook-secret:dev-payment-secret}") String webhookSecret) {
+            @Value("${app.payment.webhook-secret:dev-payment-secret}") String webhookSecret,
+            @Value("${app.payment.failure-callback-urls:}") String failureCallbackUrls) {
         this.publicBaseUrl = publicBaseUrl.replaceAll("/$", "");
         this.webhookSecret = webhookSecret;
+        this.failureCallbackUrls = failureCallbackUrls;
     }
 
     public CreatePaymentResponse createPayment(CreatePaymentRequest request) {
+        if (request.isSimulateGatewayFailure()) {
+            throw new IllegalStateException("Sandbox gateway failed after client submitted payment");
+        }
+
         applyModeBehavior();
 
         String existingPaymentId = paymentIdByIdempotencyKey.get(request.getIdempotencyKey());
@@ -69,6 +79,16 @@ public class PaymentSandboxService {
             payment.setStatus(status);
             payment.setCompletedAt(ZonedDateTime.now());
             sendWebhook(payment);
+        }
+        return payment;
+    }
+
+    public SandboxPayment failOnServer(String paymentId) {
+        SandboxPayment payment = getPayment(paymentId);
+        if (payment.getStatus() == PaymentStatus.PENDING) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setCompletedAt(ZonedDateTime.now());
+            sendServerFailureCallback(payment);
         }
         return payment;
     }
@@ -119,6 +139,44 @@ public class PaymentSandboxService {
                 .body(payload)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    private void sendServerFailureCallback(SandboxPayment payment) {
+        PaymentWebhookPayload payload = new PaymentWebhookPayload();
+        payload.setTransactionId(payment.getTransactionId());
+        payload.setGatewayPaymentId(payment.getPaymentId());
+        payload.setStatus("SERVER_FAILED");
+        payload.setAmount(payment.getAmount());
+        payload.setFailureReason("Payment server failed after client submitted payment");
+        payload.setRaw(Map.of(
+                "provider", "SANDBOX",
+                "currency", payment.getCurrency(),
+                "registrationId", payment.getRegistrationId().toString()));
+
+        String signature = sign(canonicalPayload(payload));
+        for (String callbackUrl : failureCallbackUrls(payment)) {
+            try {
+                restClient.post()
+                        .uri(callbackUrl)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Sandbox-Signature", signature)
+                        .body(payload)
+                        .retrieve()
+                        .toBodilessEntity();
+            } catch (Exception e) {
+                log.warn("Sandbox server-failure callback failed: {}", callbackUrl, e);
+            }
+        }
+    }
+
+    private java.util.List<String> failureCallbackUrls(SandboxPayment payment) {
+        if (failureCallbackUrls != null && !failureCallbackUrls.isBlank()) {
+            return java.util.Arrays.stream(failureCallbackUrls.split(","))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        }
+        return java.util.List.of(payment.getWebhookUrl().replace("/webhook", "/sandbox-server-failure"));
     }
 
     private CreatePaymentResponse toResponse(SandboxPayment payment) {

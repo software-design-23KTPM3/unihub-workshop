@@ -19,6 +19,7 @@ public class CreatePaymentRequest {
     private String returnUrl;
     @NotNull
     private String webhookUrl;
+    private boolean simulateGatewayFailure;
 
     public UUID getTransactionId() { return transactionId; }
     public void setTransactionId(UUID transactionId) { this.transactionId = transactionId; }
@@ -34,4 +35,6 @@ public class CreatePaymentRequest {
     public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }
     public String getWebhookUrl() { return webhookUrl; }
     public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+    public boolean isSimulateGatewayFailure() { return simulateGatewayFailure; }
+    public void setSimulateGatewayFailure(boolean simulateGatewayFailure) { this.simulateGatewayFailure = simulateGatewayFailure; }
 }

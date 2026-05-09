@@ -26,7 +26,8 @@ public class WorkshopController {
     }
 
     @GetMapping("/workshops")
-    public List<WorkshopResponse> getAllWorkshops(Authentication authentication, @RequestParam Map<String, String> filters) {
+    public List<WorkshopResponse> getAllWorkshops(Authentication authentication,
+            @RequestParam Map<String, String> filters) {
         return workshopService.getAllWorkshops(authentication, filters);
     }
 
@@ -37,14 +38,14 @@ public class WorkshopController {
 
     @PostMapping(value = "/admin/workshops", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
     public WorkshopResponse createWorkshop(@Valid @RequestBody WorkshopRequest request, Authentication authentication) {
         return workshopService.createWorkshop(request, null, authentication);
     }
 
     @PostMapping(value = "/admin/workshops", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
     public WorkshopResponse createWorkshopMultipart(
             @RequestPart("workshop") @Valid WorkshopRequest request,
             @RequestPart(value = "file", required = false) MultipartFile file,
@@ -53,13 +54,14 @@ public class WorkshopController {
     }
 
     @PutMapping(value = "/admin/workshops/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
-    public WorkshopResponse updateWorkshop(@PathVariable UUID id, @Valid @RequestBody WorkshopRequest request, Authentication authentication) {
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
+    public WorkshopResponse updateWorkshop(@PathVariable UUID id, @Valid @RequestBody WorkshopRequest request,
+            Authentication authentication) {
         return workshopService.updateWorkshop(id, request, null, authentication);
     }
 
     @PutMapping(value = "/admin/workshops/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
     public WorkshopResponse updateWorkshopMultipart(
             @PathVariable UUID id,
             @RequestPart("workshop") @Valid WorkshopRequest request,
@@ -69,13 +71,13 @@ public class WorkshopController {
     }
 
     @PatchMapping("/admin/workshops/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
     public WorkshopResponse cancelWorkshop(@PathVariable UUID id, Authentication authentication) {
         return workshopService.cancelWorkshop(id, authentication);
     }
 
     @PostMapping("/admin/workshops/{id}/pdf")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ORGANIZER')")
     public void uploadPdf(@PathVariable UUID id, @RequestParam("file") MultipartFile file) {
         workshopService.uploadPdf(id, file);
     }

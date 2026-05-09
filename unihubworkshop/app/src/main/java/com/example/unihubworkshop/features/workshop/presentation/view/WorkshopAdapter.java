@@ -46,6 +46,7 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
         holder.tvDate.setText(item.getDate());
         holder.tvTime.setText(item.getTime());
         holder.tvAddress.setText(item.getAddress());
+        holder.tvSlots.setText(String.format("%d/%d seats", item.getAttendanceCount(), item.getMaxAttendance()));
         
         if (item.isFree()) {
             holder.tvPrice.setText("FREE");
@@ -55,6 +56,12 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
             holder.tvPrice.setText(String.format("%,d VND", item.getPrice()));
             holder.tvPrice.setTextColor(Color.parseColor("#5648E3"));
             holder.tvPrice.setBackgroundResource(R.drawable.bg_price);
+        }
+
+        if (item.isRegistered()) {
+            holder.tvStatus.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvStatus.setVisibility(View.GONE);
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -68,7 +75,7 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvTitle, tvAuthor, tvDate, tvTime, tvAddress, tvPrice;
+        TextView tvTitle, tvAuthor, tvDate, tvTime, tvAddress, tvPrice, tvSlots, tvStatus;
         public ViewHolder(View itemView) {
             super(itemView);
             tvTitle = itemView.findViewById(R.id.tvTitle);
@@ -77,6 +84,8 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
             tvTime = itemView.findViewById(R.id.tvTime);
             tvAddress = itemView.findViewById(R.id.tvAddress);
             tvPrice = itemView.findViewById(R.id.tvPrice);
+            tvSlots = itemView.findViewById(R.id.tvSlots);
+            tvStatus = itemView.findViewById(R.id.tvStatus);
         }
     }
 }

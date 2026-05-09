@@ -36,7 +36,7 @@ public class RegistrationController {
     }
 
     @GetMapping("/admin/registrations")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ORGANIZER', 'STAFF')")
     public java.util.List<com.unihub.backend.core.model.dto.RegistrationDetailResponse> getAllRegistrations(
             @RequestParam java.util.Map<String, String> filters) {
         return registrationService.getAllRegistrations(filters);

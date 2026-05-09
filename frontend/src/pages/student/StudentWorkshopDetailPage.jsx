@@ -25,10 +25,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ErrorState from '../../components/common/ErrorState.jsx';
 import LoadingState from '../../components/common/LoadingState.jsx';
+import MarkdownContent from '../../components/common/MarkdownContent.jsx';
 import StatusBadge from '../../components/common/StatusBadge.jsx';
 import { getMyRegistrations, registerWorkshop } from '../../services/registrationService.js';
 import { getWorkshopById } from '../../services/workshopService.js';
 import { formatDate, formatDateTime, formatMoney } from '../../utils/formatters.js';
+
+function normalizeSummary(summary) {
+  return String(summary || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
 
 export default function StudentWorkshopDetailPage() {
   const { id } = useParams();
@@ -90,6 +98,11 @@ export default function StudentWorkshopDetailPage() {
 
     return Math.max(workshop.capacity - workshop.registeredCount, 0);
   }, [workshop]);
+
+  const aiSummary = useMemo(
+    () => normalizeSummary(workshop?.aiSummary),
+    [workshop?.aiSummary],
+  );
 
   const unavailableReason = useMemo(() => {
     if (!workshop) {
@@ -234,9 +247,18 @@ export default function StudentWorkshopDetailPage() {
           </Card>
 
           <Card title="Tóm tắt workshop" bordered={false} className="section-card">
-            <Typography.Paragraph>
-              <ReadOutlined /> {workshop.aiSummary}
-            </Typography.Paragraph>
+            {aiSummary ? (
+              <div className="workshop-summary">
+                <div className="workshop-summary__icon">
+                  <ReadOutlined />
+                </div>
+                <div className="workshop-summary__content">
+                  <MarkdownContent>{aiSummary}</MarkdownContent>
+                </div>
+              </div>
+            ) : (
+              <Typography.Text type="secondary">Tóm tắt đang được cập nhật.</Typography.Text>
+            )}
           </Card>
         </Col>
 

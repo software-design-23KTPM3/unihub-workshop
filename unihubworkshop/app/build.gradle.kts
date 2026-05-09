@@ -4,9 +4,7 @@ plugins {
 
 android {
     namespace = "com.example.unihubworkshop"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.unihubworkshop"
@@ -42,7 +40,22 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.camera2)
     implementation(libs.barcode.scanning)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
+    implementation(libs.gson)
+    implementation(libs.glide)
+    implementation(libs.work.runtime)
+    
+    // Room
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    annotationProcessor("androidx.room:room-compiler:$room_version")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+
+    // Markdown rendering
+    implementation("io.noties.markwon:core:4.6.2")
 }

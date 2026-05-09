@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"/>
 
         <include android:id="@+id/inputPassword"
-            layout="@layout/item_form_input"
+            layout="@layout/item_password_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 

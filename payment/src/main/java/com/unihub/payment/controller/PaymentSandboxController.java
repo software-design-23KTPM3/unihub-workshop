@@ -46,8 +46,11 @@ public class PaymentSandboxController {
                 <form method="post" action="/sandbox/checkout/%s/fail">
                   <button class="secondary" type="submit">Từ chối thanh toán</button>
                 </form>
+                <form method="post" action="/sandbox/checkout/%s/server-fail">
+                  <button class="danger" type="submit">Đã trả tiền nhưng server thanh toán lỗi</button>
+                </form>
                 <a class="link" href="%s">Quay lại vé</a>
-                """.formatted(paymentId, paymentId, escape(payment.getReturnUrl()));
+                """.formatted(paymentId, paymentId, paymentId, escape(payment.getReturnUrl()));
 
         return """
                 <!doctype html>
@@ -66,7 +69,7 @@ public class PaymentSandboxController {
                     dt{color:#667085} dd{margin:0;font-weight:700;word-break:break-word}
                     form{margin:10px 0}
                     button,.link{display:block;width:100%%;box-sizing:border-box;border-radius:8px;padding:12px 14px;text-align:center;font-weight:800;text-decoration:none}
-                    button{border:0;cursor:pointer}.primary{background:#1677ff;color:#fff}.secondary{background:#fff1f0;color:#c41d1d;border:1px solid #ffa39e}
+                    button{border:0;cursor:pointer}.primary{background:#1677ff;color:#fff}.secondary{background:#fff1f0;color:#c41d1d;border:1px solid #ffa39e}.danger{background:#c41d1d;color:#fff}
                     .link{margin-top:12px;color:#344054;border:1px solid #d0d5dd}.notice{padding:12px;border-radius:8px;background:#fff7e6;color:#ad6800}
                   </style>
                 </head>
@@ -101,6 +104,12 @@ public class PaymentSandboxController {
     @PostMapping("/checkout/{paymentId}/fail")
     public ResponseEntity<Void> fail(@PathVariable String paymentId) {
         SandboxPayment payment = paymentSandboxService.complete(paymentId, PaymentStatus.FAILED);
+        return ResponseEntity.status(HttpStatus.FOUND).header("Location", payment.getReturnUrl()).build();
+    }
+
+    @PostMapping("/checkout/{paymentId}/server-fail")
+    public ResponseEntity<Void> serverFail(@PathVariable String paymentId) {
+        SandboxPayment payment = paymentSandboxService.failOnServer(paymentId);
         return ResponseEntity.status(HttpStatus.FOUND).header("Location", payment.getReturnUrl()).build();
     }
 

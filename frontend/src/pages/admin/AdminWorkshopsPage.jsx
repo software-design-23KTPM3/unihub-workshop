@@ -2,6 +2,7 @@ import { Button, Card, DatePicker, Descriptions, Form, Input, Modal, Select, Spa
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkshopTable from '../../components/admin/WorkshopTable.jsx';
+import MarkdownContent from '../../components/common/MarkdownContent.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import StatusBadge from '../../components/common/StatusBadge.jsx';
 import { cancelWorkshop, getAllWorkshops } from '../../services/workshopService.js';
@@ -12,6 +13,13 @@ const statusOptions = [
   { value: 'FULL', label: 'FULL' },
   { value: 'CANCELLED', label: 'CANCELLED' },
 ];
+
+function normalizeSummary(summary) {
+  return String(summary || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
 
 export default function AdminWorkshopsPage() {
   const [workshops, setWorkshops] = useState([]);
@@ -147,7 +155,11 @@ export default function AdminWorkshopsPage() {
                 {selectedWorkshop.roomMapText || 'Chưa cập nhật'}
               </Descriptions.Item>
               <Descriptions.Item label="Tóm tắt tự động">
-                {selectedWorkshop.aiSummary || 'Chưa có tóm tắt'}
+                {selectedWorkshop.aiSummary ? (
+                  <MarkdownContent>{normalizeSummary(selectedWorkshop.aiSummary)}</MarkdownContent>
+                ) : (
+                  'Chưa có tóm tắt'
+                )}
               </Descriptions.Item>
             </Descriptions>
           </Space>

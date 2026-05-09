@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/test/stress").permitAll()
                         .requestMatchers("/api/payments/webhook").permitAll()
+                        .requestMatchers("/api/payments/sandbox-server-failure").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter)))

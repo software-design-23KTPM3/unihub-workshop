@@ -8,6 +8,8 @@ import com.unihub.backend.core.config.RabbitConfig;
 import com.unihub.backend.core.model.dto.*;
 import com.unihub.backend.core.model.entity.*;
 import com.unihub.backend.core.model.enums.RegistrationStatus;
+import com.unihub.backend.core.model.enums.NotificationStatus;
+import com.unihub.backend.core.model.enums.NotificationType;
 import com.unihub.backend.core.repository.*;
 import com.unihub.backend.core.service.RegistrationService;
 import com.unihub.backend.core.service.RedisService;
@@ -39,6 +41,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         private final RegistrationRepository registrationRepository;
         private final TransactionRepository transactionRepository;
         private final TransactionTemplate transactionTemplate;
+        private final NotificationRepository notificationRepository;
 
         public RegistrationServiceImpl(
                         RedisService redisService,
@@ -47,7 +50,8 @@ public class RegistrationServiceImpl implements RegistrationService {
                         StudentRepository studentRepository,
                         RegistrationRepository registrationRepository,
                         TransactionRepository transactionRepository,
-                        org.springframework.transaction.PlatformTransactionManager transactionManager) {
+                        org.springframework.transaction.PlatformTransactionManager transactionManager,
+                        NotificationRepository notificationRepository) {
                 this.redisService = redisService;
                 this.rabbitTemplate = rabbitTemplate;
                 this.workshopRepository = workshopRepository;
@@ -55,6 +59,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 this.registrationRepository = registrationRepository;
                 this.transactionRepository = transactionRepository;
                 this.transactionTemplate = new TransactionTemplate(transactionManager);
+                this.notificationRepository = notificationRepository;
         }
 
         @Override
@@ -102,7 +107,8 @@ public class RegistrationServiceImpl implements RegistrationService {
                         Registration existingRegistration = registrationRepository
                                         .findByStudentMssvAndWorkshopId(studentMssv, workshopId)
                                         .orElse(null);
-                        if (existingRegistration != null && existingRegistration.getStatus() != RegistrationStatus.FAILED) {
+                        if (existingRegistration != null
+                                        && existingRegistration.getStatus() != RegistrationStatus.FAILED) {
                                 return toCreateResponse(existingRegistration);
                         }
 
@@ -143,12 +149,14 @@ public class RegistrationServiceImpl implements RegistrationService {
                         String studentMssv,
                         UUID workshopId,
                         RegistrationStatus initialStatus) {
-                Thread.startVirtualThread(() -> persistRegistrationAndPublishTasks(
+                Thread worker = new Thread(() -> persistRegistrationAndPublishTasks(
                                 registrationId,
                                 idempotencyKey,
                                 studentMssv,
                                 workshopId,
-                                initialStatus));
+                                initialStatus),
+                                "registration-task-" + registrationId);
+                worker.start();
         }
 
         private void persistRegistrationAndPublishTasks(
@@ -280,6 +288,13 @@ public class RegistrationServiceImpl implements RegistrationService {
                         registrations = registrationRepository.findAll();
                 }
 
+                if (filters.containsKey("status")) {
+                        RegistrationStatus status = RegistrationStatus.valueOf(filters.get("status"));
+                        registrations = registrations.stream()
+                                        .filter(r -> r.getStatus() == status)
+                                        .collect(java.util.stream.Collectors.toList());
+                }
+
                 return registrations.stream()
                                 .map(this::mapToDetailResponse)
                                 .collect(java.util.stream.Collectors.toList());
@@ -365,7 +380,8 @@ public class RegistrationServiceImpl implements RegistrationService {
                 if (!registration.getWorkshop().getIsPaid()) {
                         return "FREE";
                 }
-                if (registration.getStatus() == RegistrationStatus.SUCCESS || registration.getStatus() == RegistrationStatus.CHECKED_IN) {
+                if (registration.getStatus() == RegistrationStatus.SUCCESS
+                                || registration.getStatus() == RegistrationStatus.CHECKED_IN) {
                         return "PAID";
                 }
                 return transactionRepository.findByRegistrationId(registration.getId())
@@ -400,6 +416,18 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         private void sendNotification(Workshop workshop, Student student, RegistrationStatus status, String qrCode) {
                 boolean pendingPayment = status == RegistrationStatus.PENDING;
+                if (!pendingPayment) {
+                        Notification inAppNotification = Notification.builder()
+                                        .student(student)
+                                        .workshop(workshop)
+                                        .type(NotificationType.IN_APP)
+                                        .content("You have successfully registered for the workshop: " + workshop.getName()
+                                                        + ". Your QR ticket is ready.")
+                                        .status(NotificationStatus.PENDING)
+                                        .build();
+                        notificationRepository.save(inAppNotification);
+                }
+
                 NotificationData data = NotificationData.builder()
                                 .title(pendingPayment
                                                 ? "REGISTER WORKSHOP " + workshop.getName() + " PENDING PAYMENT"
@@ -408,8 +436,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                                                 ? "Hi " + student.getName()
                                                                 + ", your seat is temporarily reserved. Please complete payment within 30 minutes."
                                                 : "Congratulations " + student.getName()
-                                                                + "! You have successfully registered. QR code: "
-                                                                + qrCode)
+                                                                + "! You have successfully registered. Your QR ticket is ready below.")
                                 .to(student.getEmail())
                                 .qrPayload(pendingPayment ? null : qrCode)
                                 .qrImageBase64(pendingPayment ? null : qrImageBase64(qrCode))

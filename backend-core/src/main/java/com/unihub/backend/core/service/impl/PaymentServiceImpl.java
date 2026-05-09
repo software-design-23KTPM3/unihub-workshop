@@ -7,10 +7,14 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import com.unihub.backend.core.config.RabbitConfig;
 import com.unihub.backend.core.exception.PaymentException;
 import com.unihub.backend.core.model.dto.*;
+import com.unihub.backend.core.model.entity.Notification;
 import com.unihub.backend.core.model.entity.Registration;
 import com.unihub.backend.core.model.entity.Transaction;
+import com.unihub.backend.core.model.enums.NotificationStatus;
+import com.unihub.backend.core.model.enums.NotificationType;
 import com.unihub.backend.core.model.enums.RegistrationStatus;
 import com.unihub.backend.core.model.enums.TransactionStatus;
+import com.unihub.backend.core.repository.NotificationRepository;
 import com.unihub.backend.core.repository.RegistrationRepository;
 import com.unihub.backend.core.repository.TransactionRepository;
 import com.unihub.backend.core.service.PaymentService;
@@ -40,6 +44,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final RegistrationRepository registrationRepository;
     private final TransactionRepository transactionRepository;
+    private final NotificationRepository notificationRepository;
     private final PaymentGatewayClient paymentGatewayClient;
     private final RabbitTemplate rabbitTemplate;
     private final String frontendBaseUrl;
@@ -49,6 +54,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentServiceImpl(
             RegistrationRepository registrationRepository,
             TransactionRepository transactionRepository,
+            NotificationRepository notificationRepository,
             PaymentGatewayClient paymentGatewayClient,
             RabbitTemplate rabbitTemplate,
             @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl,
@@ -56,6 +62,7 @@ public class PaymentServiceImpl implements PaymentService {
             @Value("${app.payment.webhook-secret:dev-payment-secret}") String webhookSecret) {
         this.registrationRepository = registrationRepository;
         this.transactionRepository = transactionRepository;
+        this.notificationRepository = notificationRepository;
         this.paymentGatewayClient = paymentGatewayClient;
         this.rabbitTemplate = rabbitTemplate;
         this.frontendBaseUrl = frontendBaseUrl.replaceAll("/$", "");
@@ -83,6 +90,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         Transaction transaction = getTransaction(registrationId);
+        boolean simulateGatewayFailure = request != null && request.isSimulateGatewayFailure();
 
         if (transaction.getStatus() == TransactionStatus.SUCCESS) {
             registration.setStatus(RegistrationStatus.SUCCESS);
@@ -90,7 +98,8 @@ public class PaymentServiceImpl implements PaymentService {
             return toStartResponse(transaction, "Thanh toán đã hoàn tất.");
         }
         if (transaction.getStatus() == TransactionStatus.PENDING
-                && transaction.getPaymentUrl() != null && transaction.getPgTransactionId() != null) {
+                && transaction.getPaymentUrl() != null && transaction.getPgTransactionId() != null
+                && !simulateGatewayFailure) {
             return toStartResponse(transaction, "Tiếp tục phiên thanh toán hiện tại.");
         }
 
@@ -114,6 +123,7 @@ public class PaymentServiceImpl implements PaymentService {
         sandboxRequest.setIdempotencyKey(idempotencyKey);
         sandboxRequest.setReturnUrl(frontendBaseUrl + "/student/tickets/" + registration.getId());
         sandboxRequest.setWebhookUrl(webhookUrl);
+        sandboxRequest.setSimulateGatewayFailure(simulateGatewayFailure);
 
         SandboxPaymentCreateResponse sandboxResponse = paymentGatewayClient.createPayment(sandboxRequest);
         if (sandboxResponse == null || sandboxResponse.getPaymentId() == null || sandboxResponse.getPaymentUrl() == null) {
@@ -171,12 +181,63 @@ public class PaymentServiceImpl implements PaymentService {
         return new PaymentWebhookResponse("OK", "Webhook processed");
     }
 
+    @Override
+    @Transactional
+    public PaymentWebhookResponse simulateGatewayServerFailure(PaymentWebhookRequest request, String signature) {
+        validateWebhook(request, signature);
+
+        Transaction transaction = transactionRepository.findById(request.getTransactionId())
+                .or(() -> transactionRepository.findByPgTransactionId(request.getGatewayPaymentId()))
+                .orElseThrow(() -> new PaymentException("Transaction not found"));
+
+        if (transaction.getStatus() != TransactionStatus.SUCCESS) {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transaction.setPaymentUrl(null);
+            transaction.setPgTransactionId(null);
+            transaction.setFailureReason("Cổng thanh toán lỗi sau khi sinh viên gửi yêu cầu thanh toán");
+            transaction.setRawCallback(Map.of(
+                    "gatewayPaymentId", String.valueOf(request.getGatewayPaymentId()),
+                    "status", "SERVER_FAILED",
+                    "reason", transaction.getFailureReason()));
+            transactionRepository.save(transaction);
+        }
+
+        SandboxPaymentCreateRequest failedRequest = new SandboxPaymentCreateRequest();
+        failedRequest.setTransactionId(transaction.getId());
+        failedRequest.setRegistrationId(transaction.getRegistration().getId());
+        failedRequest.setAmount(transaction.getAmount());
+        failedRequest.setCurrency("VND");
+        failedRequest.setIdempotencyKey(UUID.randomUUID());
+        failedRequest.setReturnUrl(frontendBaseUrl + "/student/tickets/" + transaction.getRegistration().getId());
+        failedRequest.setWebhookUrl(webhookUrl);
+        failedRequest.setSimulateGatewayFailure(true);
+
+        for (int i = 0; i < 2; i++) {
+            try {
+                paymentGatewayClient.createPayment(failedRequest);
+            } catch (Exception ignored) {
+                // Expected: this demo endpoint intentionally records gateway failures.
+            }
+        }
+
+        return new PaymentWebhookResponse("OK", "Sandbox server-side failure recorded");
+    }
+
     private void sendPaymentSuccessNotification(Registration registration) {
+        Notification inAppNotification = Notification.builder()
+                .student(registration.getStudent())
+                .workshop(registration.getWorkshop())
+                .type(NotificationType.IN_APP)
+                .content("Payment successful for workshop: " + registration.getWorkshop().getName()
+                        + ". Your QR ticket is ready.")
+                .status(NotificationStatus.PENDING)
+                .build();
+        notificationRepository.save(inAppNotification);
+
         NotificationData data = NotificationData.builder()
                 .title("PAYMENT WORKSHOP " + registration.getWorkshop().getName() + " SUCCESS")
                 .msg("Congratulations " + registration.getStudent().getName()
-                        + "! Your payment is successful and your workshop ticket is valid. QR code: "
-                        + registration.getQrCode())
+                        + "! Your payment is successful and your workshop ticket is valid. Your QR ticket is ready below.")
                 .to(registration.getStudent().getEmail())
                 .qrPayload(registration.getQrCode())
                 .qrImageBase64(qrImageBase64(registration.getQrCode()))

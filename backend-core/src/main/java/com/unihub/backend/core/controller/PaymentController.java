@@ -36,4 +36,11 @@ public class PaymentController {
             @RequestHeader(name = "X-Sandbox-Signature", required = false) String signature) {
         return paymentService.handleWebhook(request, signature);
     }
+
+    @PostMapping("/payments/sandbox-server-failure")
+    public PaymentWebhookResponse sandboxServerFailure(
+            @RequestBody PaymentWebhookRequest request,
+            @RequestHeader(name = "X-Sandbox-Signature", required = false) String signature) {
+        return paymentService.simulateGatewayServerFailure(request, signature);
+    }
 }

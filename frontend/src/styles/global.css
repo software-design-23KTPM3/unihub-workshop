@@ -119,6 +119,10 @@ a {
   width: 100%;
 }
 
+.preserve-lines {
+  white-space: pre-line;
+}
+
 .auth-layout {
   display: grid;
   min-height: 100vh;
@@ -367,6 +371,75 @@ a {
 
 .section-card {
   margin-top: 16px;
+}
+
+.workshop-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  background: #f8fbff;
+  border: 1px solid #e6eef9;
+  border-radius: 12px;
+}
+
+.workshop-summary__icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: #1769e0;
+  background: #eaf3ff;
+  border-radius: 10px;
+  font-size: 18px;
+}
+
+.workshop-summary__content {
+  min-width: 0;
+}
+
+.markdown-content {
+  color: #344054;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.markdown-content h3,
+.markdown-content h4 {
+  margin: 0 0 8px;
+  color: #102a43;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.markdown-content h3 {
+  font-size: 18px;
+}
+
+.markdown-content h4 {
+  font-size: 16px;
+}
+
+.markdown-content p {
+  margin-bottom: 10px;
+}
+
+.markdown-content ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.markdown-content li {
+  margin-bottom: 6px;
+}
+
+.markdown-content strong {
+  color: #172033;
+  font-weight: 700;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
 }
 
 .registration-card {

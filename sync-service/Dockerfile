@@ -10,4 +10,4 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Create data directories
 RUN mkdir -p /data/archive
-ENTRYPOINT ["sh", "-c", "sleep 80 && java -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "sleep 40 && java -jar app.jar"]

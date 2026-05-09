@@ -27,16 +27,17 @@ public class NotificationEmail implements NotificationChannel {
     public void send(NotificationData data) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            boolean hasQrAttachment = data.getQrImageBase64() != null && !data.getQrImageBase64().isBlank();
-            MimeMessageHelper helper = new MimeMessageHelper(message, hasQrAttachment, "UTF-8");
+            boolean hasQrImage = data.getQrImageBase64() != null && !data.getQrImageBase64().isBlank();
+            MimeMessageHelper helper = new MimeMessageHelper(message, hasQrImage, "UTF-8");
             helper.setFrom(mailAddress);
             helper.setTo(data.getTo());
             helper.setSubject(data.getTitle());
-            helper.setText(data.getMsg(), renderHtml(data, hasQrAttachment));
+            helper.setText(data.getMsg(), renderHtml(data, hasQrImage));
 
-            if (hasQrAttachment) {
-                helper.addAttachment("unihub-workshop-qr.png",
-                        new ByteArrayResource(Base64.getDecoder().decode(data.getQrImageBase64())));
+            if (hasQrImage) {
+                helper.addInline("qr-ticket",
+                        new ByteArrayResource(Base64.getDecoder().decode(data.getQrImageBase64())),
+                        "image/png");
             }
 
             mailSender.send(message);
@@ -45,15 +46,21 @@ public class NotificationEmail implements NotificationChannel {
         }
     }
 
-    private String renderHtml(NotificationData data, boolean hasQrAttachment) {
+    private String renderHtml(NotificationData data, boolean hasQrImage) {
         String title = escape(data.getTitle());
         String message = escape(data.getMsg());
         String workshopTitle = valueOrFallback(data.getWorkshopTitle(), "Workshop");
         String workshopTime = valueOrFallback(data.getWorkshopTime(), "Theo lịch đã công bố");
         String workshopRoom = valueOrFallback(data.getWorkshopRoom(), "Sẽ cập nhật");
         String workshopSpeaker = valueOrFallback(data.getWorkshopSpeaker(), "Sẽ cập nhật");
-        String qrNote = hasQrAttachment
-                ? "<p style=\"margin:16px 0 0;color:#344054;font-size:14px;line-height:1.6\">QR check-in đã được đính kèm trong email này. Vui lòng xuất trình QR tại cửa phòng.</p>"
+        String qrBlock = hasQrImage
+                ? """
+                  <div style="margin:18px 0 0;padding:18px;text-align:center;border:1px dashed #c8d7ee;border-radius:12px;background:#ffffff">
+                    <div style="margin:0 0 12px;color:#1769e0;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">QR check-in</div>
+                    <img src="cid:qr-ticket" alt="UniHub Workshop QR check-in" width="240" height="240" style="display:block;margin:0 auto;width:240px;height:240px;border:0" />
+                    <p style="margin:12px 0 0;color:#344054;font-size:14px;line-height:1.6">Vui lòng xuất trình QR này tại cửa phòng để check-in.</p>
+                  </div>
+                  """
                 : "";
 
         return """
@@ -99,7 +106,7 @@ public class NotificationEmail implements NotificationChannel {
                 escape(workshopTime),
                 escape(workshopRoom),
                 escape(workshopSpeaker),
-                qrNote);
+                qrBlock);
     }
 
     private String valueOrFallback(String value, String fallback) {

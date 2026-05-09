@@ -11,6 +11,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.example.unihubworkshop.features.auth.presentation.view.LoginView;
+import com.example.unihubworkshop.features.workshop.presentation.view.StaffPortalView;
 import com.example.unihubworkshop.features.workshop.presentation.view.WorkshopView;
 
 public class MainActivity extends AppCompatActivity {
@@ -29,8 +30,13 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // If logged in, go to WorkshopView (role-based detail navigation is handled there)
-        Intent intent = new Intent(MainActivity.this, WorkshopView.class);
+        String role = sharedPreferences.getString("userRole", "STUDENT");
+        Intent intent = new Intent(
+                MainActivity.this,
+                "CHECKIN_STAFF".equals(role) || "STAFF".equals(role) || "ORGANIZER".equals(role)
+                        ? StaffPortalView.class
+                        : WorkshopView.class
+        );
         startActivity(intent);
         finish();
     }

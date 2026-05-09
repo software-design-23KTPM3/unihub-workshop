@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface PaymentService {
     PaymentStartResponse startPayment(UUID registrationId, PaymentStartRequest request, Authentication authentication);
     PaymentWebhookResponse handleWebhook(PaymentWebhookRequest request, String signature);
+    PaymentWebhookResponse simulateGatewayServerFailure(PaymentWebhookRequest request, String signature);
 }

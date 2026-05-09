@@ -80,6 +80,7 @@ services:
     environment:
       - APP_PAYMENT_PUBLIC_BASE_URL=http://localhost/sandbox
       - APP_PAYMENT_WEBHOOK_SECRET=dev-payment-secret
+      - APP_PAYMENT_FAILURE_CALLBACK_URLS=http://backend1:8080/api/payments/sandbox-server-failure,http://backend2:8080/api/payments/sandbox-server-failure,http://backend3:8080/api/payments/sandbox-server-failure
 
   notification-consumer:
     build: ./notification-consumer

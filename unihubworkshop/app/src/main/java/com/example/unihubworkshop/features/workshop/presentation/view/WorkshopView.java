@@ -1,5 +1,6 @@
 package com.example.unihubworkshop.features.workshop.presentation.view;
 
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -24,12 +25,41 @@ public class WorkshopView extends AppCompatActivity {
         setContentView(R.layout.activity_workshop);
 
         // Manual DI
-        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl();
-        viewModel = new WorkshopViewModel(new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
+        WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl(this);
+        viewModel = new WorkshopViewModel(repo, new GetWorkshopsUseCase(repo), new GetWorkshopDetailUseCase(repo));
 
         setupUI();
         setupRecyclerView();
         observeViewModel();
+        createNotificationChannel();
+        requestNotificationPermission();
+    }
+
+    private void createNotificationChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            String channelId = "workshop_notifications";
+            CharSequence name = "Workshop Notifications";
+            String description = "Notifications for workshop registrations";
+            int importance = NotificationManager.IMPORTANCE_HIGH;
+            android.app.NotificationChannel channel = new android.app.NotificationChannel(channelId, name, importance);
+            channel.setDescription(description);
+            android.app.NotificationManager notificationManager = getSystemService(android.app.NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    private void requestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                androidx.core.app.ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        viewModel.loadWorkshops();
     }
 
     private void setupUI() {
@@ -51,16 +81,7 @@ public class WorkshopView extends AppCompatActivity {
         rv.setLayoutManager(new LinearLayoutManager(this));
         adapter = new WorkshopAdapter(null);
         adapter.setOnItemClickListener(workshop -> {
-            SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
-            String role = sharedPreferences.getString("userRole", "STUDENT");
-            
-            Intent intent;
-            if ("STAFF".equals(role)) {
-                intent = new Intent(this, WorkshopDetailView.class);
-            } else {
-                intent = new Intent(this, StudentWorkshopDetailView.class);
-            }
-            
+            Intent intent = new Intent(this, StudentWorkshopDetailView.class);
             intent.putExtra("workshop_id", workshop.getId());
             startActivity(intent);
         });
@@ -73,4 +94,3 @@ public class WorkshopView extends AppCompatActivity {
         });
     }
 }
-
