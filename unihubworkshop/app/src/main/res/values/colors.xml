@@ -15,4 +15,5 @@
     <color name="staff_tag">#4DFFFFFF</color>
     <color name="white">#FFFFFF</color>
     <color name="gray_disabled">#BDBDBD</color>
+    <color name="background_dark">#121212</color>
 </resources>

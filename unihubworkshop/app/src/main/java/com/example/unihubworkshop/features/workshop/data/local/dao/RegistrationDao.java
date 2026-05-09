@@ -23,4 +23,7 @@ public interface RegistrationDao {
 
     @Query("SELECT COUNT(*) FROM registrations WHERE workshopId = :workshopId AND status = 'CHECKED_IN'")
     LiveData<Integer> getCheckedInCount(String workshopId);
+
+    @Query("SELECT * FROM registrations WHERE workshopId = :workshopId")
+    LiveData<List<RegistrationEntity>> getAllRegistrations(String workshopId);
 }

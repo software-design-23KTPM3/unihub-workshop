@@ -20,4 +20,13 @@ public interface WorkshopRepository {
     WorkShop getWorkshopByIdLocal(String id);
     LiveData<WorkShop> getWorkshopLiveData(String id);
     void syncWorkshopAndRegistrations(String id);
+    LiveData<List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity>> getRegistrationDetails(String workshopId);
+
+    enum CheckinResult {
+        SUCCESS,
+        ALREADY_CHECKED_IN,
+        INVALID_TICKET,
+        ERROR
+    }
+    CheckinResult verifyOfflineCheckinDetailed(String qrCode, String workshopId);
 }

@@ -29,13 +29,13 @@ public class MainActivity extends AppCompatActivity {
 
         android.util.Log.d("MainActivity", "isLoggedIn: " + isLoggedIn + ", hasToken: " + (accessToken != null));
 
-        // Nếu đã đăng nhập VÀ có token, chuyển hướng ngay tới Home
+        // If logged in AND has token, redirect to Home immediately
         if (isLoggedIn && accessToken != null) {
             redirectToHome(sharedPreferences.getString("userRole", "STUDENT"));
             return;
         }
 
-        // Nếu chưa đăng nhập, hiển thị giao diện Login
+        // If not logged in, show Login UI
         setContentView(R.layout.activity_login);
         setupLoginUI();
     }
@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
         etUsername.setHint("Enter username");
         etPassword.setHint("Enter password");
 
-        // Đảm bảo masking cho password
+        // Ensure password masking
         etPassword.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
 
         btnLogin.setOnClickListener(v -> {

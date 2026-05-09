@@ -141,7 +141,7 @@ public class QRScannerView extends AppCompatActivity {
 
         String registrationId = extractRegistrationId(rawData);
         if (registrationId == null) {
-            Toast.makeText(this, "Mã QR không hợp lệ.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Invalid QR Code.", Toast.LENGTH_SHORT).show();
             isProcessing = false;
             return;
         }
@@ -151,15 +151,19 @@ public class QRScannerView extends AppCompatActivity {
             com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository repo = 
                 new com.example.unihubworkshop.features.workshop.data.repository.WorkshopRepositoryImpl(QRScannerView.this);
                 
-            boolean success = repo.verifyOfflineCheckin(registrationId, currentWorkshopId);
+            com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult result = 
+                repo.verifyOfflineCheckinDetailed(registrationId, currentWorkshopId);
             
             runOnUiThread(() -> {
-                if (success) {
-                    Toast.makeText(QRScannerView.this, "Đã ghi nhận check-in offline: " + registrationId, Toast.LENGTH_LONG).show();
+                if (result == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.SUCCESS) {
+                    Toast.makeText(QRScannerView.this, "Offline check-in recorded: " + registrationId, Toast.LENGTH_LONG).show();
                     CheckinSyncWorker.enqueue(QRScannerView.this);
                     finish();
+                } else if (result == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.ALREADY_CHECKED_IN) {
+                    Toast.makeText(QRScannerView.this, "Ticket already checked in.", Toast.LENGTH_LONG).show();
+                    isProcessing = false;
                 } else {
-                    Toast.makeText(QRScannerView.this, "Vé không hợp lệ hoặc đã check-in.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(QRScannerView.this, "Invalid ticket.", Toast.LENGTH_LONG).show();
                     isProcessing = false;
                 }
             });

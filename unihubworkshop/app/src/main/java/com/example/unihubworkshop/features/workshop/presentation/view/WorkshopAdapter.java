@@ -14,6 +14,7 @@ import java.util.List;
 public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHolder> {
     private List<WorkShop> list;
     private OnItemClickListener listener;
+    private boolean showRegistrationStatus = true;
 
     public interface OnItemClickListener {
         void onItemClick(WorkShop workshop);
@@ -21,6 +22,11 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
 
     public void setOnItemClickListener(OnItemClickListener listener) {
         this.listener = listener;
+    }
+
+    public void setShowRegistrationStatus(boolean show) {
+        this.showRegistrationStatus = show;
+        notifyDataSetChanged();
     }
 
     public WorkshopAdapter(List<WorkShop> list) {
@@ -58,7 +64,7 @@ public class WorkshopAdapter extends RecyclerView.Adapter<WorkshopAdapter.ViewHo
             holder.tvPrice.setBackgroundResource(R.drawable.bg_price);
         }
 
-        if (item.isRegistered()) {
+        if (showRegistrationStatus && item.isRegistered()) {
             holder.tvStatus.setVisibility(View.VISIBLE);
         } else {
             holder.tvStatus.setVisibility(View.GONE);

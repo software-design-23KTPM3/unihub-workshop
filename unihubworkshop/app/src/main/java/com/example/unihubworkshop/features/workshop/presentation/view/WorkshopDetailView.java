@@ -26,6 +26,11 @@ public class WorkshopDetailView extends AppCompatActivity {
 
         String workshopId = getIntent().getStringExtra("workshop_id");
         if (workshopId != null) {
+            boolean isRegistered = getIntent().getBooleanExtra("is_registered", false);
+            String registrationId = getIntent().getStringExtra("registration_id");
+            if (isRegistered) {
+                viewModel.updateRegistrationStatus(workshopId, true, registrationId);
+            }
             viewModel.selectWorkshop(workshopId);
         }
 
@@ -38,70 +43,110 @@ public class WorkshopDetailView extends AppCompatActivity {
         btnBack.setOnClickListener(v -> finish());
 
         View btnScan = findViewById(R.id.scanContainer);
+        View btnViewList = findViewById(R.id.btnViewList);
         
         android.content.SharedPreferences prefs = getSharedPreferences("UserPrefs", MODE_PRIVATE);
         String role = prefs.getString("userRole", "");
         
         if ("CHECKIN_STAFF".equals(role) || "STAFF".equals(role) || "ORGANIZER".equals(role)) {
-            btnScan.setVisibility(View.VISIBLE);
-            findViewById(R.id.registerContainer).setVisibility(View.GONE);
-            btnScan.setOnClickListener(v -> {
-                Intent intent = new Intent(this, QRScannerView.class);
-                intent.putExtra("workshop_id", getIntent().getStringExtra("workshop_id"));
-                startActivity(intent);
-            });
+            if (btnScan != null) btnScan.setVisibility(View.VISIBLE);
+            View registerContainer = findViewById(R.id.registerContainer);
+            if (registerContainer != null) registerContainer.setVisibility(View.GONE);
+            
+            if (btnScan != null) {
+                btnScan.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, QRScannerView.class);
+                    intent.putExtra("workshop_id", getIntent().getStringExtra("workshop_id"));
+                    startActivity(intent);
+                });
+            }
+
+            if (btnViewList != null) {
+                btnViewList.setVisibility(View.VISIBLE);
+                btnViewList.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, RegisteredStudentsView.class);
+                    intent.putExtra("workshop_id", getIntent().getStringExtra("workshop_id"));
+                    startActivity(intent);
+                });
+            }
         } else if ("STUDENT".equals(role)) {
-            btnScan.setVisibility(View.GONE);
+            if (btnScan != null) btnScan.setVisibility(View.GONE);
+            if (btnViewList != null) btnViewList.setVisibility(View.GONE);
+            
             View btnRegister = findViewById(R.id.registerContainer);
-            btnRegister.setVisibility(View.VISIBLE);
-            btnRegister.setOnClickListener(v -> {
-                String id = getIntent().getStringExtra("workshop_id");
-                if (id != null) {
-                    // Update UI immediately (optimistic UI)
-                    TextView tvRegisterText = findViewById(R.id.tvRegisterText);
-                    tvRegisterText.setText("Registering...");
-                    btnRegister.setEnabled(false);
-                    
-                    viewModel.registerForWorkshop(id, success -> {
-                        runOnUiThread(() -> {
-                            if (success) {
-                                tvRegisterText.setText("Registered");
-                                btnRegister.setBackgroundResource(R.drawable.bg_button_secondary); // assuming there's a secondary bg, or keep same
-                            } else {
-                                tvRegisterText.setText("Register");
-                                btnRegister.setEnabled(true);
-                                android.widget.Toast.makeText(WorkshopDetailView.this, "Registration failed", android.widget.Toast.LENGTH_SHORT).show();
-                            }
+            if (btnRegister != null) {
+                btnRegister.setVisibility(View.VISIBLE);
+                btnRegister.setOnClickListener(v -> {
+                    String id = getIntent().getStringExtra("workshop_id");
+                    if (id != null) {
+                        TextView tvRegisterText = findViewById(R.id.tvRegisterText);
+                        if (tvRegisterText != null) tvRegisterText.setText("Registering...");
+                        btnRegister.setEnabled(false);
+                        
+                        viewModel.registerForWorkshop(id, success -> {
+                            runOnUiThread(() -> {
+                                if (success) {
+                                    if (tvRegisterText != null) tvRegisterText.setText("Registered");
+                                    btnRegister.setBackgroundResource(R.drawable.bg_button_secondary);
+                                } else {
+                                    if (tvRegisterText != null) tvRegisterText.setText("Register");
+                                    btnRegister.setEnabled(true);
+                                    android.widget.Toast.makeText(WorkshopDetailView.this, "Registration failed", android.widget.Toast.LENGTH_SHORT).show();
+                                }
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
+            }
         } else {
-            btnScan.setVisibility(View.GONE);
-            findViewById(R.id.registerContainer).setVisibility(View.GONE);
+            if (btnScan != null) btnScan.setVisibility(View.GONE);
+            if (btnViewList != null) btnViewList.setVisibility(View.GONE);
+            View registerContainer = findViewById(R.id.registerContainer);
+            if (registerContainer != null) registerContainer.setVisibility(View.GONE);
         }
     }
 
     private void observeViewModel() {
         viewModel.selectedWorkshop.observe(this, workshop -> {
             if (workshop != null) {
-                ((TextView) findViewById(R.id.tvWorkshopTitle)).setText(workshop.getTitle());
-                ((TextView) findViewById(R.id.tvPresenterName)).setText(workshop.getAuthor());
-                // Fallback to server attendance count initially
-                ((TextView) findViewById(R.id.tvAttendanceCount)).setText(String.valueOf(workshop.getAttendanceCount()));
-                // Render AI Summary / Description as Markdown
-                io.noties.markwon.Markwon markwon = io.noties.markwon.Markwon.create(WorkshopDetailView.this);
-                markwon.setMarkdown((TextView) findViewById(R.id.tvSummaryContent), workshop.getDescription());
-                ((TextView) findViewById(R.id.tvAddress)).setText(workshop.getRoomNumber());
+                TextView tvTitle = findViewById(R.id.tvWorkshopTitle);
+                if (tvTitle != null) tvTitle.setText(workshop.getTitle());
                 
-                // Observe local checkin count
+                TextView tvPresenter = findViewById(R.id.tvPresenterName);
+                if (tvPresenter != null) tvPresenter.setText(workshop.getAuthor());
+
+                TextView tvTime = findViewById(R.id.tvWorkshopTime);
+                if (tvTime != null) tvTime.setText(workshop.getTime());
+
+                TextView tvLocation = findViewById(R.id.tvWorkshopLocation);
+                if (tvLocation != null) tvLocation.setText(workshop.getAddress());
+
+                TextView tvSlots = findViewById(R.id.tvWorkshopSlots);
+                if (tvSlots != null) tvSlots.setText(workshop.getAttendanceCount() + "/" + workshop.getMaxAttendance());
+
+                TextView tvMaxAttendance = findViewById(R.id.tvMaxAttendance);
+                if (tvMaxAttendance != null) tvMaxAttendance.setText("/ " + workshop.getAttendanceCount());
+
+                TextView tvAttendance = findViewById(R.id.tvAttendanceCount);
+                // Initial text is set to 0 or current local count if available
+                if (tvAttendance != null) tvAttendance.setText("0");
+                
+                TextView tvSummary = findViewById(R.id.tvSummaryContent);
+                if (tvSummary != null) {
+                    io.noties.markwon.Markwon markwon = io.noties.markwon.Markwon.create(WorkshopDetailView.this);
+                    String desc = workshop.getDescription() != null ? workshop.getDescription() : "No summary available.";
+                    markwon.setMarkdown(tvSummary, desc);
+                }
+
+                TextView tvAddress = findViewById(R.id.tvAddress);
+                if (tvAddress != null) tvAddress.setText(workshop.isFree() ? "FREE WORKSHOP" : "PAID WORKSHOP");
+                
                 viewModel.getLocalAttendanceCount(workshop.getId()).observe(this, localCount -> {
-                    if (localCount != null && localCount > 0) {
-                        ((TextView) findViewById(R.id.tvAttendanceCount)).setText(String.valueOf(localCount));
+                    if (localCount != null) {
+                        if (tvAttendance != null) tvAttendance.setText(String.valueOf(localCount));
                     }
                 });
                 
-                // Update register button if already registered
                 if (workshop.isRegistered()) {
                     View btnRegister = findViewById(R.id.registerContainer);
                     TextView tvRegisterText = findViewById(R.id.tvRegisterText);

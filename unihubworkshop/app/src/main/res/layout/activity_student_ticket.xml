@@ -65,6 +65,20 @@
                 android:textColor="#666666"
                 android:textSize="14sp" />
 
+            <TextView
+                android:id="@+id/tvTicketStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_price_free"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="4dp"
+                android:text="REGISTERED"
+                android:textColor="@color/green_live"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

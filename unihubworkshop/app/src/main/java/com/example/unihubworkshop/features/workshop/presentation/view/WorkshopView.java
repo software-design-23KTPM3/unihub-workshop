@@ -93,6 +93,8 @@ public class WorkshopView extends AppCompatActivity {
         adapter.setOnItemClickListener(workshop -> {
             Intent intent = new Intent(this, StudentWorkshopDetailView.class);
             intent.putExtra("workshop_id", workshop.getId());
+            intent.putExtra("is_registered", workshop.isRegistered());
+            intent.putExtra("registration_id", workshop.getRegistrationId());
             startActivity(intent);
         });
         rv.setAdapter(adapter);

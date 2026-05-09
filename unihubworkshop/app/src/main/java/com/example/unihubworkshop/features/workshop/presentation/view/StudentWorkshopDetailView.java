@@ -7,6 +7,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.unihubworkshop.R;
 import com.example.unihubworkshop.features.notification.NotificationPoller;
+import com.example.unihubworkshop.features.workshop.data.datasource.RegistrationRequestDto;
 import com.example.unihubworkshop.features.workshop.data.repository.WorkshopRepositoryImpl;
 import com.example.unihubworkshop.features.workshop.domain.entity.WorkShop;
 import com.example.unihubworkshop.features.workshop.domain.usecase.GetWorkshopDetailUseCase;
@@ -27,6 +28,11 @@ public class StudentWorkshopDetailView extends AppCompatActivity {
 
         String workshopId = getIntent().getStringExtra("workshop_id");
         if (workshopId != null) {
+            boolean isRegistered = getIntent().getBooleanExtra("is_registered", false);
+            String registrationId = getIntent().getStringExtra("registration_id");
+            if (isRegistered) {
+                viewModel.updateRegistrationStatus(workshopId, true, registrationId);
+            }
             viewModel.selectWorkshop(workshopId);
         }
 
@@ -74,6 +80,9 @@ public class StudentWorkshopDetailView extends AppCompatActivity {
                 } else {
                     btnRegister.setEnabled(true);
                     btnRegister.setText("Register Now");
+                    android.content.SharedPreferences prefs = getSharedPreferences("UserPrefs", MODE_PRIVATE);
+                    String studentId = prefs.getString("userId", "");
+                    RegistrationRequestDto req = new RegistrationRequestDto(workshop.getId(), studentId);
                     btnRegister.setOnClickListener(v -> registerWorkshop(workshop.getId()));
                 }
             }

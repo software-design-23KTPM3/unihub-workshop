@@ -58,6 +58,10 @@ public class WorkshopViewModel extends ViewModel {
         return repository.getLocalAttendanceCount(workshopId);
     }
 
+    public LiveData<List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity>> getRegistrationDetails(String workshopId) {
+        return repository.getRegistrationDetails(workshopId);
+    }
+
     public boolean verifyOfflineCheckin(String qrCode, String workshopId) {
         // Runs on caller's thread, recommend running in background if needed
         return repository.verifyOfflineCheckin(qrCode, workshopId);

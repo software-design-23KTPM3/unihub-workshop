@@ -44,13 +44,13 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                 com.example.unihubworkshop.features.workshop.data.local.entity.WorkshopEntity entity = new com.example.unihubworkshop.features.workshop.data.local.entity.WorkshopEntity();
                 entity.id = dto.getId();
                 entity.title = valueOrDefault(dto.getTitle(), "Workshop");
-                entity.speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Chưa cập nhật");
+                entity.speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Not updated");
                 entity.price = dto.getPrice() == null ? 0 : dto.getPrice().intValue();
                 entity.date = valueOrDefault(dto.getDate(), "");
                 entity.time = joinTime(dto.getStartTime(), dto.getEndTime());
                 entity.room = valueOrDefault(dto.getRoom(), "");
                 entity.description = firstNonBlank(dto.getAiSummary(), dto.getDescription(), "");
-                entity.roomMapText = valueOrDefault(dto.getRoomMapText(), "Chưa cập nhật sơ đồ phòng");
+                entity.roomMapText = valueOrDefault(dto.getRoomMapText(), "Room map not updated");
                 entity.isOpen = "OPEN".equalsIgnoreCase(dto.getStatus());
                 entity.registeredCount = dto.getRegisteredCount() == null ? 0 : dto.getRegisteredCount();
                 entity.capacity = dto.getCapacity() == null ? 0 : dto.getCapacity();
@@ -174,13 +174,13 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                     com.example.unihubworkshop.features.workshop.data.local.entity.WorkshopEntity entity = new com.example.unihubworkshop.features.workshop.data.local.entity.WorkshopEntity();
                     entity.id = dto.getId();
                     entity.title = valueOrDefault(dto.getTitle(), "Workshop");
-                    entity.speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Chưa cập nhật");
+                    entity.speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Not updated");
                     entity.price = dto.getPrice() == null ? 0 : dto.getPrice().intValue();
                     entity.date = valueOrDefault(dto.getDate(), "");
                     entity.time = joinTime(dto.getStartTime(), dto.getEndTime());
                     entity.room = valueOrDefault(dto.getRoom(), "");
                     entity.description = firstNonBlank(dto.getAiSummary(), dto.getDescription(), "");
-                    entity.roomMapText = valueOrDefault(dto.getRoomMapText(), "Chưa cập nhật sơ đồ phòng");
+                    entity.roomMapText = valueOrDefault(dto.getRoomMapText(), "Room map not updated");
                     entity.isOpen = "OPEN".equalsIgnoreCase(dto.getStatus());
                     entity.registeredCount = dto.getRegisteredCount() == null ? 0 : dto.getRegisteredCount();
                     entity.capacity = dto.getCapacity() == null ? 0 : dto.getCapacity();
@@ -223,7 +223,7 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
 
         int capacity = dto.getCapacity() == null ? 0 : dto.getCapacity();
         int registered = dto.getRegisteredCount() == null ? 0 : dto.getRegisteredCount();
-        String speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Chưa cập nhật");
+        String speaker = firstNonBlank(dto.getSpeakerName(), dto.getSpeaker(), "Not updated");
         String date = valueOrDefault(dto.getDate(), "");
         String time = joinTime(dto.getStartTime(), dto.getEndTime());
         String room = valueOrDefault(dto.getRoom(), "");
@@ -243,7 +243,7 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                 dto.getTags() == null ? new ArrayList<>() : dto.getTags(),
                 registered,
                 capacity,
-                valueOrDefault(dto.getRoomMapText(), "Chưa cập nhật sơ đồ phòng"),
+                valueOrDefault(dto.getRoomMapText(), "Room map not updated"),
                 registrationId != null,
                 registrationId
         );
@@ -283,7 +283,7 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
     @Override
     public void registerForWorkshop(String workshopId, java.util.function.Consumer<Boolean> callback) {
         SharedPreferences prefs = context.getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
-        String studentId = prefs.getString("userMssv", "");
+        String studentId = prefs.getString("userId", "");
         
         com.example.unihubworkshop.features.workshop.data.datasource.RegistrationRequestDto request = 
                 new com.example.unihubworkshop.features.workshop.data.datasource.RegistrationRequestDto(workshopId, studentId);
@@ -317,7 +317,7 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
         try {
             List<com.example.unihubworkshop.features.workshop.data.datasource.RegistrationDetailResponseDto> response = 
                 RetrofitClient.getClient(context).create(com.example.unihubworkshop.features.workshop.data.datasource.RegistrationApi.class)
-                .getRegistrationsByWorkshop(workshopId, "SUCCESS").execute().body();
+                .getRegistrationsByWorkshop(workshopId, null).execute().body();
                 
             if (response != null && !response.isEmpty()) {
                 List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> entities = new ArrayList<>();
@@ -346,14 +346,33 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
     }
 
     @Override
+    public androidx.lifecycle.LiveData<List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity>> getRegistrationDetails(String workshopId) {
+        return com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context)
+                .registrationDao().getAllRegistrations(workshopId);
+    }
+
+    @Override
     public boolean verifyOfflineCheckin(String qrCode, String workshopId) {
+        return verifyOfflineCheckinDetailed(qrCode, workshopId) == CheckinResult.SUCCESS;
+    }
+
+    @Override
+    public CheckinResult verifyOfflineCheckinDetailed(String qrCode, String workshopId) {
         com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase db = 
             com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context);
             
         com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity registration = 
             db.registrationDao().findByQrCode(qrCode, workshopId);
             
-        if (registration != null && !"CHECKED_IN".equals(registration.status)) {
+        if (registration == null) {
+            return CheckinResult.INVALID_TICKET;
+        }
+
+        if ("CHECKED_IN".equals(registration.status)) {
+            return CheckinResult.ALREADY_CHECKED_IN;
+        }
+
+        try {
             // Mark as checked in locally
             db.registrationDao().markAsCheckedIn(registration.id);
             
@@ -376,8 +395,10 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                     System.currentTimeMillis()
                 );
             db.checkinEventDao().insert(event);
-            return true;
+            return CheckinResult.SUCCESS;
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing offline checkin", e);
+            return CheckinResult.ERROR;
         }
-        return false;
     }
 }

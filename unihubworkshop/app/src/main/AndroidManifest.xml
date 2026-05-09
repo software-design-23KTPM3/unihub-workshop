@@ -50,6 +50,9 @@
         <activity
             android:name=".features.workshop.presentation.view.StudentTicketView"
             android:exported="false"/>
+        <activity
+            android:name=".features.workshop.presentation.view.RegisteredStudentsView"
+            android:exported="false"/>
     </application>
 
 </manifest>

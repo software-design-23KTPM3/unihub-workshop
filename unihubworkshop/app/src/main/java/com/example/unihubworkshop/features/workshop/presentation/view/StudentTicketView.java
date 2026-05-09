@@ -3,6 +3,7 @@ package com.example.unihubworkshop.features.workshop.presentation.view;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -54,6 +55,18 @@ public class StudentTicketView extends AppCompatActivity {
         ((TextView) findViewById(R.id.tvWorkshopTitle)).setText(ticket.getWorkshop().getTitle());
         ((TextView) findViewById(R.id.tvWorkshopTime)).setText(ticket.getWorkshop().getDate() + " | " + ticket.getWorkshop().getStartTime());
         ((TextView) findViewById(R.id.tvRegistrationId)).setText("ID: " + ticket.getId());
+
+        TextView tvStatus = findViewById(R.id.tvTicketStatus);
+        if (tvStatus != null) {
+            tvStatus.setVisibility(View.VISIBLE);
+            if ("CHECKED_IN".equalsIgnoreCase(ticket.getStatus())) {
+                tvStatus.setText("CHECKED-IN");
+                tvStatus.setTextColor(android.graphics.Color.parseColor("#00838F")); // Cyan dark
+            } else {
+                tvStatus.setText("REGISTERED");
+                tvStatus.setTextColor(android.graphics.Color.parseColor("#00C853")); // Green
+            }
+        }
 
         RegistrationApi api = RetrofitClient.getClient(this).create(RegistrationApi.class);
         api.getRegistrationQrImage(ticket.getId()).enqueue(new Callback<ResponseBody>() {

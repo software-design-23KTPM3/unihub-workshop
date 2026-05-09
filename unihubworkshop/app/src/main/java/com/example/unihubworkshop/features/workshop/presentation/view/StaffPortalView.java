@@ -59,7 +59,8 @@ public class StaffPortalView extends AppCompatActivity {
     private void setupRecyclerView() {
         RecyclerView rv = findViewById(R.id.rvStaffWorkshops);
         rv.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new WorkshopAdapter(null); // Will update with list
+        adapter = new WorkshopAdapter(null);
+        adapter.setShowRegistrationStatus(false);
         adapter.setOnItemClickListener(workshop -> {
             Intent intent = new Intent(this, WorkshopDetailView.class);
             intent.putExtra("workshop_id", workshop.getId());
