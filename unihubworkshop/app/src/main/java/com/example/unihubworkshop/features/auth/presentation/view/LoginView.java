@@ -55,8 +55,8 @@ public class LoginView extends AppCompatActivity {
         etUsername.setHint("Enter username");
         etPassword.setHint("Enter password");
         
-        // Robust masking for API 29+
-        etPassword.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        // Masking is now handled by TextInputLayout and its EditText in XML
+        // but we ensure it's set correctly here as well for robustness
         etPassword.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
         
         etUsername.setSingleLine(true);

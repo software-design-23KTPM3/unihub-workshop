@@ -22,6 +22,16 @@ public class StaffPortalView extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_staff_portal);
+        
+        // Security check
+        SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
+        if (!sharedPreferences.getBoolean("isLogged", false)) {
+            Intent intent = new Intent(this, com.example.unihubworkshop.MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
 
         // Manual DI
         WorkshopRepositoryImpl repo = new WorkshopRepositoryImpl(this);
@@ -40,7 +50,7 @@ public class StaffPortalView extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
         sharedPreferences.edit().clear().apply();
 
-        Intent intent = new Intent(this, LoginView.class);
+        Intent intent = new Intent(this, com.example.unihubworkshop.MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
