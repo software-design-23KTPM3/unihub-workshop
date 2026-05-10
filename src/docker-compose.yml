@@ -1,0 +1,232 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: unihub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: unihub_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      # - postgres_data:/var/lib/postgresql/data
+      - ./app-data/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./app-data/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+
+  redis-rate:
+    image: redis:7-alpine
+    container_name: unihub-redis-rate
+    ports:
+      - "6380:6379"
+    command: redis-server --save "" --appendonly no
+
+  redis-lock:
+    image: redis:7-alpine
+    container_name: unihub-redis-lock
+    ports:
+      - "6381:6379"
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: unihub-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.0.0
+    container_name: unihub-keycloak
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/unihub_db
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: password
+    command: start-dev --import-realm
+    volumes:
+      - ./service-keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    depends_on:
+      - postgres
+
+  gateway:
+    build: ./service-gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - redis-rate
+      - keycloak
+      - backend1
+      - backend2
+      - backend3
+      - payment
+
+  payment:
+    build: ./service-payment
+    container_name: unihub-payment
+    ports:
+      - "8090:8090"
+    environment:
+      - APP_PAYMENT_PUBLIC_BASE_URL=http://localhost/sandbox
+      - APP_PAYMENT_WEBHOOK_SECRET=dev-payment-secret
+      - APP_PAYMENT_FAILURE_CALLBACK_URLS=http://backend1:8080/api/payments/sandbox-server-failure,http://backend2:8080/api/payments/sandbox-server-failure,http://backend3:8080/api/payments/sandbox-server-failure
+
+  notification-consumer:
+    build: ./consumer-notification
+    container_name: unihub-notification-consumer
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - MAIL_ADDRESS=${MAIL_ADDRESS:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  summary-consumer:
+    build: ./consumer-summary
+    container_name: unihub-summary-consumer
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-dev-missing-openrouter-key}
+    depends_on:
+      postgres:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+
+  backend1:
+    build: ./backend
+    container_name: unihub-backend-1
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs
+      - APP_FRONTEND_BASE_URL=http://localhost:3000
+      - APP_PAYMENT_SANDBOX_BASE_URL=http://payment:8090
+      - APP_PAYMENT_WEBHOOK_URL=http://backend1:8080/api/payments/webhook
+      - APP_PAYMENT_WEBHOOK_SECRET=dev-payment-secret
+    depends_on:
+      - postgres
+      - redis-lock
+      - rabbitmq
+      - keycloak
+      - payment
+    volumes:
+      - ./uploads:/app/uploads
+
+  backend2:
+    build: ./backend
+    container_name: unihub-backend-2
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs
+      - APP_FRONTEND_BASE_URL=http://localhost:3000
+      - APP_PAYMENT_SANDBOX_BASE_URL=http://payment:8090
+      - APP_PAYMENT_WEBHOOK_URL=http://backend2:8080/api/payments/webhook
+      - APP_PAYMENT_WEBHOOK_SECRET=dev-payment-secret
+    depends_on:
+      - postgres
+      - redis-lock
+      - rabbitmq
+      - keycloak
+      - payment
+    volumes:
+      - ./uploads:/app/uploads
+
+  backend3:
+    build: ./backend
+    container_name: unihub-backend-3
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATA_REDIS_HOST=redis-lock
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/unihub
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/unihub/protocol/openid-connect/certs
+      - APP_FRONTEND_BASE_URL=http://localhost:3000
+      - APP_PAYMENT_SANDBOX_BASE_URL=http://payment:8090
+      - APP_PAYMENT_WEBHOOK_URL=http://backend3:8080/api/payments/webhook
+      - APP_PAYMENT_WEBHOOK_SECRET=dev-payment-secret
+    depends_on:
+      - postgres
+      - redis-lock
+      - rabbitmq
+      - keycloak
+      - payment
+    volumes:
+      - ./uploads:/app/uploads
+
+  sync-service:
+    build: ./service-sync
+    container_name: unihub-sync-service
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/unihub_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - APP_KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - APP_KEYCLOAK_REALM=unihub
+      - APP_KEYCLOAK_CLIENT_ID=user-sync-service
+      - APP_KEYCLOAK_CLIENT_SECRET=super-secure-sync-secret-123
+      - APP_SYNC_CSV_PATH=/service-sync-data
+      - APP_SYNC_ARCHIVE_PATH=/service-sync-data/archive
+    volumes:
+      - ./service-sync-data:/service-sync-data
+    depends_on:
+      - postgres
+      - keycloak
+
+  frontend:
+    build: ./app-web
+    container_name: unihub-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+
+  adminer:
+    image: adminer
+    container_name: unihub-adminer
+    restart: always
+    ports:
+      - 8082:8080
+
+volumes:
+  postgres_data:

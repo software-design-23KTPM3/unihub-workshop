@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <!-- Top Bar -->
+    <View
+        android:id="@+id/topBarBackground"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="#FFFFFF"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvWorkshop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:text="Explore Workshops"
+        android:textColor="#2D3142"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@id/topBarBackground"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/topBarBackground" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnLogout"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginEnd="24dp"
+        android:text="Logout"
+        android:textAllCaps="false"
+        android:textColor="#2D3142"
+        app:backgroundTint="#F4F6FA"
+        app:cornerRadius="8dp"
+        app:icon="@drawable/ic_logout"
+        app:iconTint="#2D3142"
+        app:layout_constraintBottom_toBottomOf="@id/tvWorkshop"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tvWorkshop" />
+
+    <!-- Workshop List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvWorkshop"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/topBarBackground"
+        tools:listitem="@layout/item_workshop" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
