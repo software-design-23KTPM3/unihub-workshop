@@ -15,6 +15,19 @@ function readStoredPaymentSession(registrationId) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isAsyncRegistrationPending(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.status === 404 ||
+    message.includes('registration not found') ||
+    message.includes('payment transaction not found');
+}
+
 export default function StudentPaymentPage() {
   const { registrationId } = useParams();
   const [searchParams] = useSearchParams();
@@ -32,12 +45,32 @@ export default function StudentPaymentPage() {
     paymentSession?.amount ? formatMoney(paymentSession.amount) : ''
   ), [paymentSession?.amount]);
 
+  const startPaymentWhenReady = async () => {
+    let lastError;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try {
+        const registrationResult = await getRegistrationById(registrationId);
+        setRegistration(registrationResult);
+        return await startRegistrationPayment(registrationId);
+      } catch (err) {
+        lastError = err;
+        if (!isAsyncRegistrationPending(err)) {
+          throw err;
+        }
+        await sleep(1000);
+      }
+    }
+
+    throw lastError || new Error('Chưa thể mở thanh toán. Vui lòng thử lại sau.');
+  };
+
   const retryPayment = async () => {
     sessionStorage.removeItem(`payment-session:${registrationId}`);
     setError('');
     setStarting(true);
     try {
-      const payment = await startRegistrationPayment(registrationId);
+      const payment = await startPaymentWhenReady();
       setPaymentSession(payment);
       sessionStorage.setItem(`payment-session:${registrationId}`, JSON.stringify(payment));
       window.history.replaceState(null, '', `/student/tickets/${registrationId}/payment`);
@@ -62,8 +95,12 @@ export default function StudentPaymentPage() {
         }
       } catch (err) {
         if (!ignore) {
-          setError(err.message || 'Không tải được trạng thái thanh toán.');
-          setLoading(false);
+          if (isAsyncRegistrationPending(err)) {
+            setLoading(false);
+          } else {
+            setError(err.message || 'Không tải được trạng thái thanh toán.');
+            setLoading(false);
+          }
         }
       }
     }
@@ -87,7 +124,7 @@ export default function StudentPaymentPage() {
       setStarting(true);
       setError('');
       try {
-        const payment = await startRegistrationPayment(registrationId);
+        const payment = await startPaymentWhenReady();
         if (!ignore) {
           setPaymentSession(payment);
           sessionStorage.setItem(`payment-session:${registrationId}`, JSON.stringify(payment));
@@ -113,7 +150,7 @@ export default function StudentPaymentPage() {
     return <LoadingState rows={8} />;
   }
 
-  if (error && (!paymentUrl || paymentResult === 'retry')) {
+  if (error && !starting && (!paymentUrl || paymentResult === 'retry')) {
     return (
       <ErrorState
         title="Thanh toán tạm thời không khả dụng"
@@ -188,8 +225,12 @@ export default function StudentPaymentPage() {
         <Alert
           type="info"
           showIcon
-          message="Chờ sinh viên hoàn tất thanh toán"
-          description="Sau khi hoàn tất thanh toán, trang này sẽ tự cập nhật trạng thái vé."
+          message={starting ? 'Đang chuẩn bị phiên thanh toán' : 'Chờ sinh viên hoàn tất thanh toán'}
+          description={
+            starting
+              ? 'Hệ thống đang xác nhận chỗ đã giữ và mở cổng thanh toán. Vui lòng chờ trong giây lát.'
+              : 'Sau khi hoàn tất thanh toán, trang này sẽ tự cập nhật trạng thái vé.'
+          }
         />
       )}
 

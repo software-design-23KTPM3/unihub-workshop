@@ -47,7 +47,6 @@ export default function StudentWorkshopDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successRegistration, setSuccessRegistration] = useState(null);
-  const [pendingRegistration, setPendingRegistration] = useState(null);
   const pendingPayment = myRegistration?.status === 'PENDING' || myRegistration?.paymentStatus === 'PENDING';
 
   useEffect(() => {
@@ -150,7 +149,6 @@ export default function StudentWorkshopDetailPage() {
       const registrationId = registration.registrationId || registration.id;
 
       if (registration.status === 'PENDING') {
-        setPendingRegistration(registration);
         setMyRegistration({
           id: registrationId,
           workshop,
@@ -158,6 +156,7 @@ export default function StudentWorkshopDetailPage() {
           status: registration.status,
           paymentStatus: 'PENDING',
         });
+        navigate(`/student/tickets/${registrationId}/payment`);
         return;
       }
 
@@ -283,7 +282,13 @@ export default function StudentWorkshopDetailPage() {
               </Row>
 
               {myRegistration ? (
-                <Link to={`/student/tickets/${myRegistration.id || myRegistration.registrationId}`}>
+                <Link
+                  to={
+                    pendingPayment
+                      ? `/student/tickets/${myRegistration.id || myRegistration.registrationId}/payment`
+                      : `/student/tickets/${myRegistration.id || myRegistration.registrationId}`
+                  }
+                >
                   <Button
                     type="primary"
                     size="large"
@@ -302,7 +307,7 @@ export default function StudentWorkshopDetailPage() {
                   disabled={Boolean(unavailableReason)}
                   onClick={handleRegister}
                 >
-                  {workshop.isPaid ? 'Giữ chỗ và thanh toán sau' : 'Đăng ký'}
+                  {workshop.isPaid ? 'Giữ chỗ và thanh toán' : 'Đăng ký'}
                 </Button>
               )}
 
@@ -314,7 +319,7 @@ export default function StudentWorkshopDetailPage() {
                   description={
                     myRegistration
                       ? pendingPayment
-                        ? 'Chỗ của bạn đã được giữ. Mở trang vé để tiếp tục thanh toán.'
+                        ? 'Chỗ của bạn đã được giữ. Tiếp tục thanh toán bằng nút bên trên.'
                         : 'Bạn có thể mở QR ticket từ nút bên trên.'
                       : undefined
                   }
@@ -343,43 +348,6 @@ export default function StudentWorkshopDetailPage() {
           status="success"
           title="Bạn đã đăng ký workshop miễn phí thành công."
           subTitle="QR ticket đã sẵn sàng để xuất trình tại phòng."
-        />
-      </Modal>
-
-      <Modal
-        title="Đã giữ chỗ chờ thanh toán"
-        open={Boolean(pendingRegistration)}
-        onCancel={() => setPendingRegistration(null)}
-        footer={[
-          <Button key="close" onClick={() => setPendingRegistration(null)}>
-            Ở lại trang này
-          </Button>,
-          pendingRegistration?.registrationId && (
-            <Button key="ticket" onClick={() => navigate(`/student/tickets/${pendingRegistration.registrationId}`)}>
-              Xem vé tạm
-            </Button>
-          ),
-          <Button
-            key="history"
-            type="primary"
-            onClick={() =>
-              navigate('/student/my-registrations', {
-                state: {
-                  registrationAccepted: true,
-                  registrationId: pendingRegistration?.registrationId,
-                  message: pendingRegistration?.message,
-                },
-              })
-            }
-          >
-            Mở đăng ký của tôi
-          </Button>,
-        ]}
-      >
-        <Result
-          status="info"
-          title="Chỗ của bạn đang được giữ trong hệ thống."
-          subTitle={pendingRegistration?.message || 'Vào Đăng ký của tôi để hoàn tất thanh toán.'}
         />
       </Modal>
     </div>

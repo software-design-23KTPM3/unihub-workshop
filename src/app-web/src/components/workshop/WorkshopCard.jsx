@@ -55,14 +55,8 @@ export default function WorkshopCard({ workshop, myRegistration, onRegistered })
       onRegistered?.(workshop, registration);
 
       if (registration.status === 'PENDING') {
-        message.info(registration.message || 'Đã giữ chỗ. Vui lòng vào Đăng ký của tôi để hoàn tất thanh toán.');
-        navigate('/student/my-registrations', {
-          state: {
-            registrationAccepted: true,
-            registrationId,
-            message: registration.message,
-          },
-        });
+        message.info(registration.message || 'Đã giữ chỗ. Vui lòng hoàn tất thanh toán.');
+        navigate(`/student/tickets/${registrationId}/payment`);
         return;
       }
 
@@ -130,7 +124,13 @@ export default function WorkshopCard({ workshop, myRegistration, onRegistered })
           {hasRegistered ? (
             <Button
               icon={pendingPayment ? <ClockCircleOutlined /> : <QrcodeOutlined />}
-              onClick={() => navigate(`/student/tickets/${registrationId}`)}
+              onClick={() =>
+                navigate(
+                  pendingPayment
+                    ? `/student/tickets/${registrationId}/payment`
+                    : `/student/tickets/${registrationId}`,
+                )
+              }
             >
               {pendingPayment ? 'Thanh toán' : 'Xem vé'}
             </Button>
@@ -140,7 +140,7 @@ export default function WorkshopCard({ workshop, myRegistration, onRegistered })
               loading={registering}
               onClick={handleQuickRegister}
             >
-              {workshop.isPaid ? 'Giữ chỗ' : 'Đăng ký'}
+              {workshop.isPaid ? 'Giữ chỗ và thanh toán' : 'Đăng ký'}
             </Button>
           )}
         </div>

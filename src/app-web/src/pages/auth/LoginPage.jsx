@@ -9,6 +9,19 @@ const roleTargets = {
   STAFF: '/admin/dashboard',
 };
 
+function isAllowedReturnPath(path, role) {
+  if (!path) {
+    return false;
+  }
+  if (path.startsWith('/student')) {
+    return role === 'STUDENT';
+  }
+  if (path.startsWith('/admin')) {
+    return role === 'ORGANIZER' || role === 'STAFF';
+  }
+  return path === '/';
+}
+
 export default function LoginPage() {
   const { currentUser, login, isAuthenticated, isLoading, error } = useAuth();
   const location = useLocation();
@@ -40,7 +53,9 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated && currentUser) {
-    const target = from || roleTargets[currentUser.role] || '/';
+    const target = isAllowedReturnPath(from, currentUser.role)
+      ? from
+      : roleTargets[currentUser.role] || '/';
     return <Navigate to={target} replace />;
   }
 
