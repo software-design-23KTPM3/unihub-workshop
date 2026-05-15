@@ -13,7 +13,7 @@ import com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEve
 import com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity;
 import com.example.unihubworkshop.features.workshop.data.local.entity.WorkshopEntity;
 
-@Database(entities = {RegistrationEntity.class, CheckinEventEntity.class, WorkshopEntity.class}, version = 2, exportSchema = false)
+@Database(entities = {RegistrationEntity.class, CheckinEventEntity.class, WorkshopEntity.class}, version = 3, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract RegistrationDao registrationDao();
     public abstract CheckinEventDao checkinEventDao();
@@ -33,5 +33,18 @@ public abstract class AppDatabase extends RoomDatabase {
             }
         }
         return INSTANCE;
+    }
+
+    public static void destroyInstance() {
+        if (INSTANCE != null) {
+            synchronized (AppDatabase.class) {
+                if (INSTANCE != null) {
+                    if (INSTANCE.isOpen()) {
+                        INSTANCE.close();
+                    }
+                    INSTANCE = null;
+                }
+            }
+        }
     }
 }

@@ -24,6 +24,8 @@ public interface WorkshopRepository {
 
     enum CheckinResult {
         SUCCESS,
+        SUCCESS_ONLINE,
+        SUCCESS_OFFLINE,
         ALREADY_CHECKED_IN,
         INVALID_TICKET,
         ERROR

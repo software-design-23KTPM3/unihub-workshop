@@ -15,15 +15,21 @@ public class RegistrationEntity {
     public String studentName;
     public String qrCode;
     public String status;
+    public boolean isOfflineOnly = false;
 
     public RegistrationEntity() {}
 
     public RegistrationEntity(@NonNull String id, String workshopId, String studentId, String studentName, String qrCode, String status) {
+        this(id, workshopId, studentId, studentName, qrCode, status, false);
+    }
+
+    public RegistrationEntity(@NonNull String id, String workshopId, String studentId, String studentName, String qrCode, String status, boolean isOfflineOnly) {
         this.id = id;
         this.workshopId = workshopId;
         this.studentId = studentId;
         this.studentName = studentName;
         this.qrCode = qrCode;
         this.status = status;
+        this.isOfflineOnly = isOfflineOnly;
     }
 }

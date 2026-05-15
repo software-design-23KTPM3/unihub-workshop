@@ -159,9 +159,15 @@ public class QRScannerView extends AppCompatActivity {
             final com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult finalResult = result;
             
             runOnUiThread(() -> {
-                if (finalResult == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.SUCCESS) {
-                    Toast.makeText(QRScannerView.this, "Offline check-in recorded: " + registrationId, Toast.LENGTH_LONG).show();
-                    CheckinSyncWorker.enqueue(QRScannerView.this);
+                if (finalResult == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.SUCCESS_ONLINE) {
+                    Toast.makeText(QRScannerView.this, "Check-in successful (Online)", Toast.LENGTH_SHORT).show();
+                    finish();
+                } else if (finalResult == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.SUCCESS_OFFLINE) {
+                    Toast.makeText(QRScannerView.this, "Check-in recorded (Offline)", Toast.LENGTH_LONG).show();
+                    com.example.unihubworkshop.features.workshop.data.sync.CheckinSyncWorker.enqueue(QRScannerView.this);
+                    finish();
+                } else if (finalResult == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.SUCCESS) {
+                    Toast.makeText(QRScannerView.this, "Check-in successful", Toast.LENGTH_SHORT).show();
                     finish();
                 } else if (finalResult == com.example.unihubworkshop.features.workshop.domain.repository.WorkshopRepository.CheckinResult.ALREADY_CHECKED_IN) {
                     Toast.makeText(QRScannerView.this, "Ticket already checked in.", Toast.LENGTH_LONG).show();

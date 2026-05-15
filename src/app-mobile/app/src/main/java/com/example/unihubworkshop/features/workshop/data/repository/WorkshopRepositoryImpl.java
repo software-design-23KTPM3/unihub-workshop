@@ -2,9 +2,13 @@ package com.example.unihubworkshop.features.workshop.data.repository;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.util.Log;
 
 import com.example.unihubworkshop.core.network.RetrofitClient;
+import com.example.unihubworkshop.features.workshop.data.datasource.CheckinApi;
+import com.example.unihubworkshop.features.workshop.data.datasource.CheckinEvent;
 import com.example.unihubworkshop.features.workshop.data.datasource.WorkshopApi;
 import com.example.unihubworkshop.features.workshop.data.datasource.WorkshopResponseDto;
 import com.example.unihubworkshop.features.workshop.domain.entity.WorkShop;
@@ -240,6 +244,16 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                     .edit()
                     .clear();
 
+            com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase db = 
+                    com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context);
+            
+            // Map current offline status
+            Map<String, Boolean> offlineStatusMap = new HashMap<>();
+            List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> locals = db.registrationDao().getAllRegistrationsList(); // All
+            for (com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity l : locals) {
+                if (l.isOfflineOnly) offlineStatusMap.put(l.id, true);
+            }
+
             List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> entities = new ArrayList<>();
             for (com.example.unihubworkshop.features.workshop.data.datasource.RegistrationDetailResponseDto registration : registrations) {
                 if (!isActiveRegistration(registration)) {
@@ -251,6 +265,9 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                     continue;
                 }
 
+                boolean isOfflineOnly = offlineStatusMap.getOrDefault(registration.getId(), false);
+                String status = isOfflineOnly ? "CHECKED_IN" : registration.getStatus();
+
                 registrationsByWorkshop.put(workshopId, registration.getId());
                 editor.putString(workshopId, registration.getId());
                 entities.add(new com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity(
@@ -259,13 +276,13 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                         registration.getStudentId(),
                         registration.getStudentName(),
                         registration.getQrCode() == null ? registration.getId() : registration.getQrCode(),
-                        registration.getStatus()));
+                        status,
+                        isOfflineOnly));
             }
 
             editor.apply();
             if (!entities.isEmpty()) {
-                com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context)
-                        .registrationDao().insertAll(entities);
+                db.registrationDao().insertAll(entities);
             }
         } catch (Exception e) {
             Log.e(TAG, "Cannot sync current student registrations", e);
@@ -402,19 +419,42 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                 .getRegistrationsByWorkshop(workshopId, null).execute().body();
                 
             if (response != null && !response.isEmpty()) {
+                com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase db = 
+                    com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context);
+                
+                List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> localList = 
+                    db.registrationDao().getAllRegistrationsSync(workshopId);
+                List<com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEventEntity> pendingEvents = 
+                    db.checkinEventDao().getPendingEvents();
+                
+                Map<String, com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> localMap = new HashMap<>();
+                for (com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity l : localList) {
+                    localMap.put(l.id, l);
+                }
+                
+                Map<String, Boolean> pendingSyncMap = new HashMap<>();
+                for (com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEventEntity e : pendingEvents) {
+                    if (e.registrationId != null) pendingSyncMap.put(e.registrationId, true);
+                }
+
                 List<com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity> entities = new ArrayList<>();
                 for (com.example.unihubworkshop.features.workshop.data.datasource.RegistrationDetailResponseDto dto : response) {
+                    com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity local = localMap.get(dto.getId());
+                    boolean isPendingSync = pendingSyncMap.getOrDefault(dto.getId(), false);
+                    boolean isOfflineOnly = isPendingSync || (local != null && local.isOfflineOnly);
+                    String status = isOfflineOnly ? "CHECKED_IN" : dto.getStatus();
+                    
                     entities.add(new com.example.unihubworkshop.features.workshop.data.local.entity.RegistrationEntity(
                             dto.getId(),
                             workshopId,
                             dto.getStudentId(),
                             dto.getStudentName(),
                             dto.getQrCode(),
-                            dto.getStatus()
+                            status,
+                            isOfflineOnly
                     ));
                 }
-                com.example.unihubworkshop.features.workshop.data.local.db.AppDatabase.getInstance(context)
-                        .registrationDao().insertAll(entities);
+                db.registrationDao().insertAll(entities);
             }
         } catch (Exception e) {
             Log.e(TAG, "Cannot fetch and cache registrations for workshop " + workshopId, e);
@@ -435,7 +475,8 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
 
     @Override
     public boolean verifyOfflineCheckin(String qrCode, String workshopId) {
-        return verifyOfflineCheckinDetailed(qrCode, workshopId) == CheckinResult.SUCCESS;
+        CheckinResult result = verifyOfflineCheckinDetailed(qrCode, workshopId);
+        return result == CheckinResult.SUCCESS || result == CheckinResult.SUCCESS_ONLINE || result == CheckinResult.SUCCESS_OFFLINE;
     }
 
     @Override
@@ -459,7 +500,7 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
         }
 
         try {
-            // Mark as checked in locally
+            // Mark as checked in locally (Safety first)
             db.registrationDao().markAsCheckedIn(registration.id);
             
             // Create pending checkin event
@@ -468,9 +509,10 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
             String staffId = context.getSharedPreferences("UserPrefs", Context.MODE_PRIVATE).getString("userId", "staff");
             String deviceId = android.provider.Settings.Secure.getString(context.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
             
+            String clientEventId = java.util.UUID.randomUUID().toString();
             com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEventEntity event = 
                 new com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEventEntity(
-                    java.util.UUID.randomUUID().toString(),
+                    clientEventId,
                     registration.studentId,
                     workshopId,
                     registration.id,
@@ -481,10 +523,41 @@ public class WorkshopRepositoryImpl implements WorkshopRepository {
                     System.currentTimeMillis()
                 );
             db.checkinEventDao().insert(event);
-            return CheckinResult.SUCCESS;
+
+            // Attempt immediate sync if online
+            if (isNetworkAvailable()) {
+                try {
+                    CheckinApi api = RetrofitClient.getClient(context).create(CheckinApi.class);
+                    CheckinEvent syncEvent = new CheckinEvent(
+                            clientEventId, registration.studentId, workshopId,
+                            registration.id, registration.qrCode, staffId, deviceId, timestamp
+                    );
+                    retrofit2.Response<Void> response = api.syncCheckins(java.util.Collections.singletonList(syncEvent)).execute();
+                    if (response.isSuccessful()) {
+                        // Success! Mark as synced and not offline-only
+                        db.checkinEventDao().deleteSynced(java.util.Collections.singletonList(clientEventId));
+                        db.registrationDao().updateIsOfflineOnly(registration.id, false);
+                        Log.d(TAG, "Immediate check-in sync successful for " + registration.id);
+                        return CheckinResult.SUCCESS_ONLINE;
+                    } else {
+                        Log.w(TAG, "Immediate sync failed with code " + response.code() + ", will sync later.");
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Immediate sync failed due to error: " + e.getMessage() + ", will sync later.");
+                }
+            }
+
+            return CheckinResult.SUCCESS_OFFLINE;
         } catch (Exception e) {
             Log.e(TAG, "Error processing offline checkin", e);
             return CheckinResult.ERROR;
         }
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        return activeNetwork != null && activeNetwork.isConnectedOrConnecting();
     }
 }

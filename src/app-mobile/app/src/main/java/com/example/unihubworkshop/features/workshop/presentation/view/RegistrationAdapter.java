@@ -39,11 +39,16 @@ public class RegistrationAdapter extends RecyclerView.Adapter<RegistrationAdapte
         holder.tvStatus.setText(registration.status);
         
         if ("CHECKED_IN".equalsIgnoreCase(registration.status)) {
-            holder.tvStatus.setTextColor(holder.itemView.getContext().getColor(R.color.green_live));
-            holder.tvStatus.setText("ĐÃ CHECK-IN");
+            if (registration.isOfflineOnly) {
+                holder.tvStatus.setTextColor(holder.itemView.getContext().getColor(R.color.orange_sync));
+                holder.tvStatus.setText("SYNCING");
+            } else {
+                holder.tvStatus.setTextColor(holder.itemView.getContext().getColor(R.color.green_live));
+                holder.tvStatus.setText("CHECKED-IN");
+            }
         } else {
             holder.tvStatus.setTextColor(holder.itemView.getContext().getColor(R.color.gray_disabled));
-            holder.tvStatus.setText("CHƯA CHECK-IN");
+            holder.tvStatus.setText("NOT CHECKED-IN");
         }
     }
 

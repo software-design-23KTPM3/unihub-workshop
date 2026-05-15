@@ -16,8 +16,8 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class RetrofitClient {
     // Android emulator reaches the host machine through 10.0.2.2.
     // For a physical device, replace these with the LAN IP of the Docker host.
-    private static final String BASE_URL = "http://10.0.2.2/";
-    private static final String KEYCLOAK_URL = "http://10.0.2.2:8080/";
+    private static final String BASE_URL = "http://10.123.1.58/";
+    private static final String KEYCLOAK_URL = "http://10.123.1.58:8080/";
 
     private static Retrofit retrofit = null;
     private static Retrofit keycloakRetrofit = null;

@@ -36,7 +36,7 @@ public class CheckinSyncWorker extends Worker {
                 .build();
 
         WorkManager.getInstance(context.getApplicationContext())
-                .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request);
+                .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request);
     }
 
     @NonNull
@@ -71,6 +71,11 @@ public class CheckinSyncWorker extends Worker {
             Response<Void> response = api.syncCheckins(pending).execute();
             if (response.isSuccessful()) {
                 db.checkinEventDao().deleteSynced(pendingIds);
+                for (com.example.unihubworkshop.features.workshop.data.local.entity.CheckinEventEntity entity : pendingEntities) {
+                    if (entity.registrationId != null) {
+                        db.registrationDao().updateIsOfflineOnly(entity.registrationId, false);
+                    }
+                }
                 return Result.success();
             }
             if (response.code() >= 500 || response.code() == 429) {
