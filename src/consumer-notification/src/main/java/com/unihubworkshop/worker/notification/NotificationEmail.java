@@ -28,7 +28,7 @@ public class NotificationEmail implements NotificationChannel {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             boolean hasQrImage = data.getQrImageBase64() != null && !data.getQrImageBase64().isBlank();
-            MimeMessageHelper helper = new MimeMessageHelper(message, hasQrImage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(mailAddress);
             helper.setTo(data.getTo());
             helper.setSubject(data.getTitle());
