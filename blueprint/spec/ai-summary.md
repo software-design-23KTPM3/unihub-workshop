@@ -1,106 +1,42 @@
-# Đặc tả: AI Summary
+# Đặc tả: Tóm tắt nội dung bằng AI (AI Content Summary)
 
 ## Mô tả
-Tính năng tự động hóa việc tóm tắt nội dung tài liệu giới thiệu workshop (PDF). Khi Ban tổ chức tải file PDF lên, hệ thống sẽ tự động xử lý, trích xuất nội dung, làm sạch văn bản và gửi sang mô hình AI để tạo bản tóm tắt giúp sinh viên dễ nắm bắt thông tin, hiển thị trên trang chi tiết workshop.
+Tính năng tự động tóm tắt nội dung của Workshop từ tài liệu PDF đính kèm. Hệ thống sử dụng mô hình ngôn ngữ lớn (LLM) để trích xuất những ý chính, giúp sinh viên nắm bắt nội dung nhanh chóng trước khi đăng ký.
 
 ## Luồng chính
-1. Khởi tạo yêu cầu: 
-    - Ban tổ chức upload file PDF tại trang tạo/sửa workshop.
-2. Xử lý tải file (Bất đồng bộ):
-    - Workshop Service (Backend) thực hiện: 
-        - Lưu file vào Storage (Local Storage hoặc S3/MinIO).
-        - Cập nhật metadata của workshop vào Database.
-        - Trả về phản hồi HTTP 202 Accepted cho máy khách ngay lập tức.
-    - Hệ thống tiếp tục cập nhật trạng thái tiến trình: `summaryStatus = PENDING`.
-    - Phát sinh sự kiện (Event Driven):
-        ```json
-        {
-            "eventId": "UUID",
-            "workshopId": "string",
-            "fileUrl": "string",
-            "fileHash": "sha256",
-            "createdAt": "timestamp"
-        }
-        ```
-    - Chuyển event vào Message Queue (RabbitMQ).
-3. Nhận và xử lý:
-    - Consumer (AI Summary Worker) kéo thông điệp từ RabbitMQ.
-    - Kiểm tra Idempotency thông qua `fileHash` (nhằm bỏ qua nếu đã xử lý trùng lặp).
-    - Cập nhật Database: `summaryStatus = PROCESSING`.
-4. Trích xuất và làm sạch dữ liệu:
-    - Tải nguyên liệu nguyên bản nội dung file từ Storage.
-    - Thông qua Framework (Apache PDFBox) rút trích các dòng văn bản.
-    - Loại bỏ mã HTML, ký tự đặc biệt rác, header hay khoảng trắng không có ý nghĩa ngữ nghĩa.
-5. Xử lý giới hạn Token (Chunking):
-    - Chia văn bản theo giới hạn token (Token Limit) của thuật toán AI đang dùng.
-    - Nếu file rất lớn, chia thành đa khối nhỏ để Model AI hiểu và sau đó áp dụng thao tác tổng hợp đa kết quả con (Map-Reduce algorithm) thành một đoạn Summary duy nhất.
-6. Gọi mô hình AI tóm tắt:
-    - Gửi request đến Google AI Studio lấy đoạn Text rút gọn chuẩn định dạng hội thảo.
-7. Lưu chuyển kết quả:
-    - Backend ghi nhận dữ liệu về `summaryText` cho mã Workshop ID. Update status = `COMPLETED` hoặc `FAILED`.
-8. Đồng bộ Realtime (SSE):
-    - (Background) Publisher gửi payload kết quả tới kết nối Server-Sent Events (SSE).
-    - Admin UI chủ động tự đổi dòng trạng thái không cần F5.
 
-### Các thành phần tham gia 
-- Workshop Sub-System
-- Message Broker (RabbitMQ)
-- Worker Group (AI Automation Process)
-- Storage System
-- PDF Parse Engine
-- LLM Cloud Platform (Google AI Studio)
-- Dữ liệu (PostgreSQL/SQL Server)
-- SSE Endpoint
+### 1. Tải lên tài liệu (Upload)
+- Khi Organizer tạo mới hoặc cập nhật Workshop kèm theo file PDF.
+- File được lưu vào hệ thống lưu trữ (thư mục `uploads`).
+- Hệ thống gửi một message (chứa `workshopId`) vào RabbitMQ `ai.summary.exchange`.
+
+### 2. Trích xuất nội dung (Text Extraction)
+`AISummaryWorker` lắng nghe hàng đợi và thực hiện:
+1.  **Đọc PDF**: Sử dụng thư viện `PDFBox` để trích xuất toàn bộ văn bản từ file PDF.
+2.  **Làm sạch dữ liệu**: Loại bỏ các ký tự thừa, số trang, khoảng trắng dư thừa để tối ưu hóa context cho AI.
+3.  **Kiểm tra kích thước**: 
+    - Nếu văn bản dưới 100,000 ký tự: Gửi toàn bộ cho AI xử lý.
+    - Nếu văn bản quá lớn: Chia nhỏ văn bản thành các đoạn (chunking) và xử lý từng phần.
+
+### 3. Tóm tắt bằng AI
+- Gọi dịch vụ AI (qua `AISummaryService`) để tạo nội dung tóm tắt.
+- Kết quả trả về là một đoạn văn bản tóm tắt súc tích.
+
+### 4. Cập nhật kết quả
+- Cập nhật trường `summary_text` trong bảng `workshops`.
+- Cập nhật `summary_status` thành `COMPLETED` (hoặc `FAILED` nếu có lỗi).
+- Sau khi hoàn tất, sinh viên có thể xem nội dung tóm tắt này trên trang chi tiết Workshop.
 
 ## Kịch bản lỗi
-<!-- Điều gì xảy ra khi: timeout, mất mạng, dữ liệu không hợp lệ, ... -->
-1. Upload file thất bại (File không lưu được vào kho lưu trữ) 
-    - Trả lỗi HTTP 500 cho Admin
-    - Không tạo event
-2. File PDF không hợp lệ (File corrupt / không đọc được)
-    - Worker đánh dấu: summaryStatus = FAILED
-    - Log error + bỏ qua bước gọi AI 
-3. Lỗi trích xuất PDF (PDFBox không thể đọc được file PDF hoặc không trích xuất được nội dung)
-    - Retry tối đa 2 lần
-    - Nếu vẫn thất bại => đánh dấu FAILED
-4. Lỗi gọi AI API (Timeout / rate limit / server error)
-    - Retry tối đa 3 lần
-    - Nếu vẫn thất bại => đánh dấu FAILED
-5. Worker crash giữa chừng
-    - Message chưa ACK => RabbitMQ re-deliver
-    - Idempotency (workshopId) đảm bảo không xử lý trùng
-6. Storage không truy cập được
-    - Retry tải file
-    - Nếu vẫn thất bại => đánh dấu FAILED
+*   **PDF bị mã hóa**: Nếu file PDF bị đặt mật khẩu hoặc mã hóa, `PDFBox` không thể trích xuất văn bản -> Đánh dấu trạng thái `FAILED`.
+*   **File quá lớn**: Xử lý bằng cơ chế chia nhỏ (chunking) để tránh vượt quá giới hạn token của API AI.
+*   **Lỗi kết nối AI**: Nếu API AI không phản hồi, worker sẽ log lỗi và đánh dấu `FAILED`.
+
 ## Ràng buộc
-1. Bất đồng bộ
-    - Upload file không được block luồng tạo workshop
-    - Trả về HTTP 202 ngay lập tức
-2. Idempotency
-    - Mỗi workshop chỉ có 1 summary active
-    - Key: workshopId
-3. Hiệu năng
-    - Xử lý tối đa 1–5 phút / file tùy size
-4. Giới hạn AI
-    - Token limit theo model
-    - Chunking text nếu vượt giới hạn input
-5. Bảo mật
-    - File URL không public nếu chứa dữ liệu nhạy cảm
-    - AI prompt không chứa thông tin nội bộ không cần thiết
-    - Validate file trước khi gửi AI
+*   **Bất đồng bộ**: Quá trình trích xuất và tóm tắt có thể mất nhiều thời gian (vài giây đến vài phút) nên bắt buộc phải xử lý qua hàng đợi (RabbitMQ) để không block giao diện quản trị.
+*   **Tài nguyên**: Giới hạn kích thước file PDF tải lên (mặc định 25MB) để tránh quá tải server.
+
 ## Tiêu chí chấp nhận
-1. Tạo summary thành công
-    - Admin upload PDF => hệ thống tạo summary tự động
-    - Kết quả lưu vào DB đúng workshop
-2. Không block user flow
-    - Upload file trả về HTTP 202 ngay lập tức
-    - Không chờ AI xử lý
-3. Không xử lý trùng
-    - Một fileHash chỉ tạo 1 summary duy nhất
-    - Không duplicate khi worker retry
-4. Retry hoạt động đúng
-    - Fail AI / PDF / Storage => retry theo rule
-    - Sau retry vẫn fail => mark FAILED
-5. Realtime update (optional)
-    - Nếu Admin đang xem page:
-        - Nhận được update qua SSE trong < 30s sau khi hoàn tất
+*   Workshop sau khi upload PDF hợp lệ sẽ có nội dung tóm tắt trong vòng vài phút.
+*   Nội dung tóm tắt hiển thị đúng trên ứng dụng của sinh viên.
+*   Trạng thái tóm tắt (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`) được cập nhật chính xác.

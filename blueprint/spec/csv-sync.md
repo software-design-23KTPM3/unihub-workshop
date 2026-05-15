@@ -1,96 +1,39 @@
 # Đặc tả: Đồng bộ dữ liệu sinh viên từ CSV (CSV Sync)
 
 ## Mô tả
-Tính năng xử lý file CSV chứa thông tin sinh viên được export từ hệ thống cũ của trường và ban đêm. Dữ liệu này dùng để xác thực sinh viên khi đăng kí.
+Tính năng tự động đồng bộ danh sách sinh viên từ các file CSV được cung cấp bởi hệ thống của trường. Dữ liệu này được sử dụng để xác thực thông tin sinh viên khi đăng ký workshop và đồng bộ tài khoản lên hệ thống Keycloak.
 
 ## Luồng chính
-1. Kích hoạt đồng bộ
-    - Scheduler (Cronjob) chạy vào 02:00AM mỗi ngày
-    - Tạo syncId (UUID) để theo dõi toàn bộ job
-2. Tìm và tải file CSV
-    - Worker kết nối SFTP/ thư mục nội bộ
-    - Lấy file mới nhất theo naming convention (vd: students_YYYYMMDD.csv)
-    - Nếu có nhiều file => chọn file cuối cùng
-3. Kiểm tra tính hợp lệ của file
-    - Validate:
-        - Định dạng CSV
-        - Header đúng schema (mssv, email, name,...)
-    - Nếu thất bại: Hủy bỏ job
-4. Đọc dữ liệu theo stream (chunking processing)
-    - Không load toàn bộ file vào RAM
-    - Đọc từng chunk (500-1000 dòng)
-    - Với mỗi record:
-        - Xóa khoảng trắng
-        - Chuẩn hóa email (lowercase)
-        - Validate format MSSV/email
-5. Xử lý dữ liệu
-    - Kiểm tra: các file bắt buộc, trùng MSSV  trong cùng file
-    - Nếu lỗi: bỏ qua record, ghi vào error buffer
-6. Cập nhật dữ liệu vào Database theo batch
-    - Với mỗi chunk:
-        - Thực hiện: INSERT ... ON CONFLICT (mssv) DO UPDATE
-        - Update các field: mssv, email, name, status
-    - Commit theo batch
-7. Ghi log đồng bộ
-    - Lưu vào bảng sync_logs: syncId, total_records, success_count, error_count, status (SUCCESS/ PARTIAL/ FAILED), started_at / finished_at 
-8. Xử lý file sau sync
-    - Di chuyển file sang: /archive/YYYY/MM/DD/
-9. Xuất file lỗi (nếu có):
-    - Ghi file: error_log_syncId.csv. File chưa dòng lỗi, nguyên nhân
+
+### 1. Kích hoạt đồng bộ (Scheduled Job)
+- Một job chạy định kỳ (cấu hình qua Cron expression trong `.env`) sẽ quét thư mục đầu vào (mặc định: `/service-sync-data`).
+- Tìm kiếm tất cả các file có đuôi `.csv`.
+
+### 2. Xử lý file CSV
+Với mỗi file tìm thấy, `StudentSyncService` thực hiện:
+1.  **Đọc file**: Sử dụng `CSVReader` để đọc dữ liệu.
+2.  **Bỏ qua Header**: Dòng đầu tiên của file được coi là header và bị bỏ qua.
+3.  **Schema**: File CSV yêu cầu 4 cột: `mssv`, `email`, `name`, `birthday` (định dạng `ddMMyyyy`).
+4.  **Đồng bộ Database**:
+    - Kiểm tra sinh viên theo `mssv`.
+    - Nếu đã tồn tại: Cập nhật thông tin (`email`, `name`, `birthday`).
+    - Nếu chưa có: Tạo mới bản ghi sinh viên với trạng thái `ACTIVE`.
+    - Dữ liệu được lưu theo batch (mỗi batch 100 bản ghi).
+5.  **Đồng bộ Keycloak**:
+    - Gọi `KeycloakIntegrationService` để tạo hoặc cập nhật tài khoản người dùng trên Keycloak tương ứng với thông tin sinh viên.
+6.  **Lưu trữ (Archive)**: Sau khi xử lý xong, file CSV có thể được di chuyển sang thư mục archive (đang cấu hình tùy chọn).
 
 ## Kịch bản lỗi
-1. File CSV sai định dạng (vd: Header không đúng/ lệch cột)
-    - Hủy bỏ job
-    - Ghi log: FAILED
-    - Không ghi dữ liệu vào database
-2. Một số dòng dữ liệu lỗi (vd: thiếu email, MSSV trùng trong file)
-    - Bỏ qua record
-    - Ghi vào error_log
-    - Tiếp tục xử lý các dòng khác
-3. Không tim thấy file
-    - Retry tối đa 3 lần, mỗi lần cách nhau tầm 15 phút
-    - Nếu vẫn thất bại: ghi log FAILED và gửi thông báo lỗi
-4. Lỗi database (deadlock/ connection lost)
-    - Retry batch hiện tại (tối đa 3 lần)
-    - Nếu vẫn thất bại: rollback batch đó, hủy bỏ job
-5. Worker crash giữa chừng
-    - Dựa vào sync_logs: Nếu status = RUNNING thì job có thể được retry lại từ đầu
+*   **Lỗi định dạng file**: Nếu file không đúng định dạng CSV hoặc thiếu cột, hệ thống ghi log lỗi và bỏ qua file đó.
+*   **Lỗi đồng bộ từng dòng**: Nếu một dòng dữ liệu bị lỗi (ví dụ: sai format), hệ thống ghi log lỗi cho sinh viên đó và tiếp tục xử lý các dòng tiếp theo.
+*   **Lỗi kết nối Keycloak**: Nếu không thể kết nối tới Keycloak, hệ thống ghi log và tiếp tục đồng bộ dữ liệu vào Database local.
 
 ## Ràng buộc
-1. Memory Management:
-    - Bắt buộc sử dụng streaming/chunking khi xử lý file lớn
-    - Không sử dụng `readAll()` hoặc các API load toàn bộ dữ liệu vào RAM để tránh Out Of Memory / job failure
-2. Performace 
-    - Background Job Processing Strategy:
-        - Job chạy vào giờ thấp điểm (night batch)
-        - Kiểm soát connection pool để tránh ảnh hưởng API production
-    - Database Write Optimization:
-        - Batch size: 500–1000 records
-        - Bắt buộc UNIQUE index trên mssv
-        - Tránh table lock toàn bộ, ưu tiên batch upsert/partial update
-3. Idempotency
-    - Upsert đảm bảo: chạy lại job không tạo duplicate
-    - Sycnc theo file snapshot (không incremental)
-4. Tính nhất quán dữ liệu
-    - Batch xử lý độc lập
-    - Không partial write trong 1 batch
-5. Tích hợp một chiều cô lập 
-    - Job hoạt động theo mô hình read-only đối với CSV source
-    - Chỉ thực hiện write vào PostgreSQL (target system)
-    - Không có bất kỳ cơ chế ghi ngược (write-back) nào về hệ thống legacy của trường
+*   **Idempotency**: Việc chạy lại job với cùng một file CSV không gây ra dữ liệu trùng lặp nhờ cơ chế kiểm tra `mssv`.
+*   **Hiệu năng**: Sử dụng Batch Save (`saveAll`) để tối ưu hóa việc ghi vào Database.
+*   **Tách biệt**: Tính năng này chạy trong một service riêng biệt (`service-sync`), không ảnh hưởng đến hiệu năng của API chính.
 
 ## Tiêu chí chấp nhận
-1. Performance
-    - Sync file 50.000 dòng trong < 5 phút
-    - RAM ổn định, không bị Out Of Memory
-2. Độ bền hệ thống
-    - File lỗi không làm crash toàn bộ job
-    - Worker crash có thể retry an toàn
-3. Tính chính xác dữ liệu
-    - Không duplicate MSSV
-    - Dữ liệu được update đúng
-4. Logging & Observability
-    - Có sync_logs cho mỗi job
-    - Có file error_log cho dòng lỗi
-5. Không ảnh hưởng hệ thống chính
-    - User vẫn truy cập app bình thường trong lúc sync
+*   Dữ liệu sinh viên từ file CSV được cập nhật đầy đủ vào bảng `students` trong PostgreSQL.
+*   Tài khoản sinh viên được tạo/cập nhật thành công trên Keycloak.
+*   Hệ thống xử lý được file lớn mà không gây treo hoặc tràn bộ nhớ.
