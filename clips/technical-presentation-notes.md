@@ -908,17 +908,3 @@ export default function RoleGuard({ allowedRoles, children }) {
 2. Login organizer: vào admin dashboard và workshop management.
 3. Login check-in staff trên mobile: vào màn hình scan QR.
 4. Gọi API check-in bằng student token: backend trả 403.
-
----
-
-## Gợi ý thứ tự quay video
-
-1. Mở C4/architecture diagram để giới thiệu container: web, mobile, backend, gateway, Redis, PostgreSQL, RabbitMQ, payment sandbox, consumers, sync service, Keycloak.
-2. Demo student login, xem workshop, reserve free/paid workshop.
-3. Demo paid registration, payment success webhook, QR xuất hiện.
-4. Demo server payment failed và circuit breaker.
-5. Demo spam request để thấy 429 rate limit.
-6. Demo check-in offline trên mobile và sync lại backend.
-7. Demo organizer upload PDF và AI summary.
-8. Demo CSV sync student vào DB/Keycloak.
-9. Kết thúc bằng RBAC: student/organizer/staff mỗi role chỉ vào đúng chức năng.
