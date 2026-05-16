@@ -16,7 +16,7 @@ app:
   sync:
     csv-path: ${APP_SYNC_CSV_PATH:/service-sync-data}
     archive-path: ${APP_SYNC_ARCHIVE_PATH:/service-sync-data/archive}
-    cron: ${APP_SYNC_CRON:0 0 2 * * *}
+    cron: ${APP_SYNC_CRON:0 0 0 * * *}
   keycloak:
     server-url: ${APP_KEYCLOAK_SERVER_URL:http://localhost:8080}
     realm: ${APP_KEYCLOAK_REALM:unihub}

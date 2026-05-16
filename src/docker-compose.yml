@@ -207,6 +207,7 @@ services:
       - APP_KEYCLOAK_CLIENT_SECRET=super-secure-sync-secret-123
       - APP_SYNC_CSV_PATH=/service-sync-data
       - APP_SYNC_ARCHIVE_PATH=/service-sync-data/archive
+      - TZ=Asia/Ho_Chi_Minh
     volumes:
       - ./service-sync-data:/service-sync-data
     depends_on:

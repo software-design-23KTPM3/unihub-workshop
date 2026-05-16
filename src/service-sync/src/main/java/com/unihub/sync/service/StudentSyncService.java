@@ -38,7 +38,7 @@ public class StudentSyncService {
     @Transactional
     public void scheduleSync() {
         log.info("Starting scheduled Student Synchronization...");
-        
+
         File folder = new File(csvPath);
         if (!folder.exists()) {
             log.warn("CSV path does not exist: {}", csvPath);
@@ -57,9 +57,9 @@ public class StudentSyncService {
 
         for (File file : files) {
             processCsvFile(file);
-            // archiveFile(file); // Comment lại để không xóa file sau khi sync (tiện cho việc test)
+            archiveFile(file);
         }
-        
+
         log.info("Student Synchronization completed.");
     }
 
@@ -67,14 +67,16 @@ public class StudentSyncService {
         log.info("Processing file: {}", file.getName());
         try (CSVReader reader = new CSVReader(new FileReader(file))) {
             List<String[]> rows = reader.readAll();
-            if (rows.isEmpty()) return;
+            if (rows.isEmpty())
+                return;
 
             // Skip header: mssv,email,name,birthday
             rows.remove(0);
 
             List<Student> dbBatch = new ArrayList<>();
             for (String[] data : rows) {
-                if (data.length < 4) continue;
+                if (data.length < 4)
+                    continue;
 
                 String mssv = data[0].trim();
                 String email = data[1].trim();
@@ -102,7 +104,7 @@ public class StudentSyncService {
                     log.error("Error syncing student {}: {}", mssv, e.getMessage());
                 }
             }
-            
+
             if (!dbBatch.isEmpty()) {
                 studentRepository.saveAll(dbBatch);
             }

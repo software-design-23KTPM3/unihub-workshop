@@ -14,11 +14,11 @@ public class SyncServiceApplication {
         SpringApplication.run(SyncServiceApplication.class, args);
     }
 
-    @Bean
-    public CommandLineRunner runSyncOnStartup(StudentSyncService syncService) {
-        return args -> {
-            System.out.println(">>> Triggering manual sync on startup...");
-            syncService.scheduleSync();
-        };
-    }
+    // @Bean
+    // public CommandLineRunner runSyncOnStartup(StudentSyncService syncService) {
+    // return args -> {
+    // System.out.println(">>> Triggering manual sync on startup...");
+    // syncService.scheduleSync();
+    // };
+    // }
 }
