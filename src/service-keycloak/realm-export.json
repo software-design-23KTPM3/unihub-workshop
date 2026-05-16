@@ -36,10 +36,6 @@
       {
         "name": "STAFF",
         "description": "Event and check-in staff"
-      },
-      {
-        "name": "CHECKIN_STAFF",
-        "description": "Mobile check-in staff"
       }
     ]
   },
@@ -156,8 +152,7 @@
         }
       ],
       "realmRoles": [
-        "STAFF",
-        "CHECKIN_STAFF"
+        "STAFF"
       ]
     }
   ]

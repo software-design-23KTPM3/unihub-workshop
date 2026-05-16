@@ -18,7 +18,7 @@ public class CheckinController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CHECKIN_STAFF', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF')")
     public void syncCheckins(@RequestBody List<CheckinEvent> events) {
         checkinService.syncCheckins(events);
     }
